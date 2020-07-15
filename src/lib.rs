@@ -1,4 +1,7 @@
 extern crate three_d;
+extern crate fnv;
+
+mod grid;
 
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -79,7 +82,7 @@ pub fn main_js() -> Result<(), JsValue> {
             program.add_uniform_mat4("worldViewProjectionMatrix", &world_view_projection).unwrap();
 
             program.draw_elements(&elements);
-        });
+        }).unwrap();
 
         frame += 1;
     }).unwrap();
