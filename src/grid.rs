@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
 pub type XY = [i32; 2];
@@ -29,6 +30,34 @@ impl<T> Grid<T> {
     /// minimal XY coordinates and size. Width and height cannot be 0.
     pub fn get(&self, position: XY) -> Option<&(T, XY, WH)> {
         Some(&self.items[self.grid.get(&position)?])
+    }
+
+    pub fn get_in_bounds(
+        &self,
+        min_x: f64,
+        max_x: f64,
+        min_y: f64,
+        max_y: f64,
+    ) -> impl Iterator<Item = &(T, XY, WH)> {
+        self.items.values().filter(move |(t, xy, wh)| {
+            let [x, y] = [xy[0] as f64, xy[1] as f64];
+            let [w, h] = [wh[0] as f64, wh[1] as f64];
+
+            x >= min_x && x + w <= max_x && y >= min_y && y + h <= max_y
+        })
+    }
+
+    /// Gets the xy positions that are empty
+    pub fn get_empty_in_bounds(&self, min_x: f64, max_x: f64, min_y: f64, max_y: f64) -> Vec<XY> {
+        let min_x = min_x.floor() as i32;
+        let max_x = max_x.ceil() as i32;
+        let min_y = min_y.floor() as i32;
+        let max_y = max_y.ceil() as i32;
+
+        iproduct!(min_x..=max_x, min_y..=max_y)
+            .filter(|(x, y)| self.grid.get(&[*x, *y]).is_none())
+            .map(|(x, y)| [x, y])
+            .collect::<Vec<_>>()
     }
 
     /// Inserts an item at a specific minimal XY position with a specific size.
@@ -70,7 +99,7 @@ impl<T> Grid<T> {
 }
 
 impl<T> FromIterator<(T, XY, WH)> for Grid<T> {
-    fn from_iter<I: IntoIterator<Item=(T, XY, WH)>>(i: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = (T, XY, WH)>>(i: I) -> Self {
         let mut g = Self::new();
 
         for (t, xy, wh) in i {
@@ -87,10 +116,10 @@ mod test {
 
     #[test]
     fn test_from_iter() {
-        let grid = [
-            ("a", [0, 0], [1, 1]),
-            ("b", [1, 0], [2, 1]),
-        ].iter().cloned().collect::<Grid<_>>();
+        let grid = [("a", [0, 0], [1, 1]), ("b", [1, 0], [2, 1])]
+            .iter()
+            .cloned()
+            .collect::<Grid<_>>();
 
         assert_eq!(Some(("a", [0, 0], [1, 1])), grid.get([0, 0]).cloned());
         assert_eq!(Some(("b", [1, 0], [2, 1])), grid.get([1, 0]).cloned());

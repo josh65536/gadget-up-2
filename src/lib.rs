@@ -1,16 +1,29 @@
-extern crate three_d;
+extern crate cgmath;
 extern crate fnv;
+extern crate graphics;
+extern crate itertools;
+extern crate three_d;
 
+mod graphics_ex;
 mod grid;
+mod render;
 
+use std::rc::Rc;
+use three_d::{Camera, Event, Screen, Window};
+use three_d::{vec3, vec4};
+use three_d::gl::Glstruct;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use three_d::{Camera, Window, Program, VertexBuffer, ElementBuffer, Screen};
+use grid::Grid;
+use render::GadgetRenderer;
 
 macro_rules! log {
     ( $($t:tt)* ) => {
-        web_sys::console::log_1(&format!( $($t)* ).into());
+        // To get rid of the unnecessary rust-analyzer error
+        unsafe {
+            web_sys::console::log_1(&format!( $($t)* ).into());
+        }
     };
 }
 
@@ -22,6 +35,44 @@ macro_rules! log {
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+pub struct App {
+    gl: Rc<Glstruct>,
+    camera: Camera,
+    grid: Grid<()>,
+    gadget_renderer: GadgetRenderer,
+}
+
+impl App {
+    pub fn new(gl: &Rc<Glstruct>) -> Self {
+        let camera = Camera::new_orthographic(
+            &gl,
+            vec3(0.0, 0.0, 0.0),
+            vec3(0.0, 0.0, -1.0),
+            vec3(0.0, 1.0, 0.0),
+            1.0,
+            1.0,
+            1.0,
+        );
+
+        Self {
+            gl: Rc::clone(gl),
+            camera,
+            grid: Grid::new(),
+            gadget_renderer: GadgetRenderer::new(&gl)
+        }
+    }
+
+    pub fn render(&mut self, width: f32, height: f32) {
+        self.camera.set_view(
+            vec3(0.0, 0.0, 0.0),
+            vec3(0.0, 0.0, -1.0),
+            vec3(0.0, 1.0, 0.0),
+        );
+        self.camera.set_orthographic_projection(width / height * 16.0, 16.0, 1.0);
+
+        render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
+    }
+}
 
 // This is like the `main` function, except for JavaScript.
 #[wasm_bindgen(start)]
@@ -31,61 +82,39 @@ pub fn main_js() -> Result<(), JsValue> {
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
 
-    use three_d::{vec3, vec4};
-
     let mut window = Window::new_default("Gadget Up! 2").unwrap();
     let gl = window.gl();
-
-    // dummy values, wish Camera::new were public
-    let mut camera = Camera::new_orthographic(&gl, vec3(0.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), 1.0, 1.0, 1.0);
-
-    let program = Program::from_source(&gl,
-        include_str!("../assets/shaders/color.vert"),
-        include_str!("../assets/shaders/color.frag")).unwrap();
-
-    let positions: Vec<f32> = vec![
-        0.5, 0.5, 0.0,
-        -0.5, 0.5, 0.0,
-        -0.5, -0.5, 0.0,
-        0.5, -0.5, 0.0,
-    ];
-    let position_buffer = VertexBuffer::new_with_static_f32(&gl, &positions).unwrap();
-
-    let colors: Vec<f32> = vec![
-        0.0, 1.0, 1.0,
-        0.0, 1.0, 1.0,
-        0.0, 0.0, 1.0,
-        0.0, 0.0, 1.0,
-    ];
-    let color_buffer = VertexBuffer::new_with_static_f32(&gl, &colors).unwrap();
-
-    let elements = ElementBuffer::new_with_u32(&gl, &[0, 1, 2, 2, 3, 0]).unwrap();
 
     let mut frame = 0;
     let original_width = crate::window().inner_width().unwrap().as_f64().unwrap() as usize;
     let original_height = crate::window().inner_height().unwrap().as_f64().unwrap() as usize;
 
-    window.render_loop(move |frame_input| {
-        let width = crate::window().inner_width().unwrap().as_f64().unwrap() as f32;
-        let height = crate::window().inner_height().unwrap().as_f64().unwrap() as f32;
+    let mut app = App::new(&gl);
 
-        log!("width: {}, height: {}", width, height);
+    window
+        .render_loop(move |frame_input| {
+            let width = crate::window().inner_width().unwrap().as_f64().unwrap() as f32;
+            let height = crate::window().inner_height().unwrap().as_f64().unwrap() as f32;
 
-        camera.set_view(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, -1.0), vec3(0.0, 1.0, 0.0));
-        camera.set_orthographic_projection(width / height * 2.0, 2.0, 1.0);
+            //log!("width: {}, height: {}", width, height);
 
-        Screen::write(&gl, 0, 0, original_width, original_height, Some(&vec4((frame % 60) as f32 / 60.0, 0.0, 0.0, 1.0)), Some(1.0), &|| {
-            program.use_attribute_vec3_float(&position_buffer, "position").unwrap();
-            program.use_attribute_vec3_float(&color_buffer, "color").unwrap();
+            Screen::write(
+                &gl,
+                0,
+                0,
+                original_width,
+                original_height,
+                Some(&vec4(0.0, 0.0, 0.0, 1.0)),
+                Some(1.0),
+                &mut || {
+                    app.render(width, height);
+                },
+            )
+            .unwrap();
 
-            let world_view_projection = camera.get_projection() * camera.get_view();
-            program.add_uniform_mat4("worldViewProjectionMatrix", &world_view_projection).unwrap();
-
-            program.draw_elements(&elements);
-        }).unwrap();
-
-        frame += 1;
-    }).unwrap();
+            frame += 1;
+        })
+        .unwrap();
 
     Ok(())
 }
