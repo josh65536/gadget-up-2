@@ -1,4 +1,7 @@
+use crate::gadget::{Gadget, GadgetRenderInfo};
 use crate::grid::{Grid, WH, XY};
+use crate::log;
+use crate::shape::{Rectangle, Shape};
 
 use std::rc::Rc;
 use three_d::core::Error;
@@ -27,7 +30,7 @@ where
     r.begin();
 
     for xy in grid.get_empty_in_bounds(min_x, max_x, min_y, max_y) {
-        r.render(None, xy, [1, 1]);
+        r.render(None, xy, (1, 1));
     }
 
     for (t, xy, wh) in grid.get_in_bounds(min_x, max_x, min_y, max_y) {
@@ -53,7 +56,7 @@ pub trait GridItemRenderer {
 pub struct GadgetRenderer {
     program: Program,
     gl: Rc<Glstruct>,
-    vertices: Vec<f32>,
+    positions: Vec<f32>,
     offsets: Vec<f32>,
     colors: Vec<f32>,
     indexes: Vec<u32>,
@@ -71,20 +74,32 @@ impl GadgetRenderer {
         Self {
             program,
             gl: Rc::clone(gl),
-            vertices: vec![],
+            positions: vec![],
             offsets: vec![],
             colors: vec![],
             indexes: vec![],
         }
     }
+
+    pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, size: WH) {
+        let x = position.0 as f32;
+        let y = position.1 as f32;
+
+        let renderer = gadget.renderer();
+
+        renderer.append_to(&mut self.positions, &mut self.indexes);
+        self.colors.extend(renderer.colors());
+        self.offsets
+            .extend([x, y, 0.0].iter().cycle().take(renderer.num_vertices() * 3));
+    }
 }
 
 impl GridItemRenderer for GadgetRenderer {
-    type Item = ();
+    type Item = Gadget;
 
     /// Start the rendering of the grid
     fn begin(&mut self) {
-        self.vertices.clear();
+        self.positions.clear();
         self.offsets.clear();
         self.colors.clear();
         self.indexes.clear();
@@ -92,18 +107,20 @@ impl GridItemRenderer for GadgetRenderer {
 
     /// Render a specific item
     fn render(&mut self, item: Option<&Self::Item>, position: XY, size: WH) {
-        let idx = self.vertices.len() as u32 / 3;
+        if let Some(gadget) = item {
+            self.render_gadget(gadget, position, size);
+        } else {
+            let x = position.0 as f32;
+            let y = position.1 as f32;
 
-        let x = position[0] as f32;
-        let y = position[1] as f32;
+            let rect = Rectangle::new(0.0, 1.0, 0.0, 1.0, GadgetRenderInfo::RECTANGLE_Z);
+            rect.append_to(&mut self.positions, &mut self.indexes);
 
-        self.indexes
-            .extend(&[idx + 0, idx + 1, idx + 2, idx + 2, idx + 3, idx + 0]);
-        self.offsets.extend(&[x, y, x, y, x, y, x, y]);
-        self.vertices
-            .extend(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0]);
-        self.colors
-            .extend(&[0.6, 0.8, 1.0, 0.7, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 1.0, 1.0]);
+            self.offsets
+                .extend(&[x, y, 0.0, x, y, 0.0, x, y, 0.0, x, y, 0.0]);
+            self.colors
+                .extend(&[0.6, 0.8, 1.0, 0.7, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 1.0, 1.0]);
+        }
     }
 
     /// Finalize the rendering of the grid
@@ -113,16 +130,24 @@ impl GridItemRenderer for GadgetRenderer {
             .add_uniform_mat4("worldViewProjectionMatrix", &world_view_projection)
             .unwrap();
 
-        let positions = VertexBuffer::new_with_static_f32(&self.gl, &self.vertices).unwrap();
+        let positions = VertexBuffer::new_with_static_f32(&self.gl, &self.positions).unwrap();
         let offsets = VertexBuffer::new_with_static_f32(&self.gl, &self.offsets).unwrap();
         let colors = VertexBuffer::new_with_static_f32(&self.gl, &self.colors).unwrap();
         let elements = ElementBuffer::new_with_u32(&self.gl, &self.indexes).unwrap();
 
+        //        log!(
+        //            "{}, {}, {}, {}",
+        //            self.positions.len(),
+        //            self.offsets.len(),
+        //            self.colors.len(),
+        //            self.indexes.len()
+        //        );
+        //
         self.program
             .use_attribute_vec3_float(&positions, "position")
             .unwrap();
         self.program
-            .use_attribute_vec2_float(&offsets, "offset")
+            .use_attribute_vec3_float(&offsets, "offset")
             .unwrap();
         self.program
             .use_attribute_vec3_float(&colors, "color")

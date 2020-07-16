@@ -2,8 +2,10 @@ use fnv::FnvHashMap;
 use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
-pub type XY = [i32; 2];
-pub type WH = [i32; 2];
+use crate::log;
+
+pub type XY = (i32, i32);
+pub type WH = (u32, u32);
 
 /// Sparse grid for storing things that do not necessarily take up
 /// a 1x1 slot
@@ -40,10 +42,10 @@ impl<T> Grid<T> {
         max_y: f64,
     ) -> impl Iterator<Item = &(T, XY, WH)> {
         self.items.values().filter(move |(t, xy, wh)| {
-            let [x, y] = [xy[0] as f64, xy[1] as f64];
-            let [w, h] = [wh[0] as f64, wh[1] as f64];
+            let [x, y] = [xy.0 as f64, xy.1 as f64];
+            let [w, h] = [wh.0 as f64, wh.1 as f64];
 
-            x >= min_x && x + w <= max_x && y >= min_y && y + h <= max_y
+            x + w >= min_x && x <= max_x && y + h >= min_y && y <= max_y
         })
     }
 
@@ -55,20 +57,19 @@ impl<T> Grid<T> {
         let max_y = max_y.ceil() as i32;
 
         iproduct!(min_x..=max_x, min_y..=max_y)
-            .filter(|(x, y)| self.grid.get(&[*x, *y]).is_none())
-            .map(|(x, y)| [x, y])
+            .filter(|xy| self.grid.get(&xy).is_none())
             .collect::<Vec<_>>()
     }
 
     /// Inserts an item at a specific minimal XY position with a specific size.
     /// Removes overlapping items.
     pub fn insert(&mut self, t: T, position: XY, size: WH) {
-        let [x, y] = position;
-        let [w, h] = size;
+        let (x, y) = position;
+        let (w, h) = size;
 
-        for y in y..(y + h) {
-            for x in x..(x + w) {
-                self.remove([x, y]);
+        for y in y..(y + h as i32) {
+            for x in x..(x + w as i32) {
+                self.remove((x, y));
             }
         }
 
@@ -77,9 +78,9 @@ impl<T> Grid<T> {
 
         self.items.insert(idx, (t, position, size));
 
-        for y in y..(y + h) {
-            for x in x..(x + w) {
-                self.grid.insert([x, y], idx);
+        for y in y..(y + h as i32) {
+            for x in x..(x + w as i32) {
+                self.grid.insert((x, y), idx);
             }
         }
     }
@@ -87,11 +88,11 @@ impl<T> Grid<T> {
     /// Removes the item at a specific position
     pub fn remove(&mut self, position: XY) {
         if let Some(idx) = self.grid.get(&position) {
-            let (t, [x, y], [w, h]) = self.items.remove(idx).unwrap();
+            let (t, (x, y), (w, h)) = self.items.remove(idx).unwrap();
 
-            for y in y..(y + h) {
-                for x in x..(x + w) {
-                    self.grid.remove(&[x, y]);
+            for y in y..(y + h as i32) {
+                for x in x..(x + w as i32) {
+                    self.grid.remove(&(x, y));
                 }
             }
         }
@@ -116,23 +117,23 @@ mod test {
 
     #[test]
     fn test_from_iter() {
-        let grid = [("a", [0, 0], [1, 1]), ("b", [1, 0], [2, 1])]
+        let grid = [("a", (0, 0), (1, 1)), ("b", (1, 0), (2, 1))]
             .iter()
             .cloned()
             .collect::<Grid<_>>();
 
-        assert_eq!(Some(("a", [0, 0], [1, 1])), grid.get([0, 0]).cloned());
-        assert_eq!(Some(("b", [1, 0], [2, 1])), grid.get([1, 0]).cloned());
-        assert_eq!(Some(("b", [1, 0], [2, 1])), grid.get([2, 0]).cloned());
+        assert_eq!(Some(("a", (0, 0), (1, 1))), grid.get((0, 0)).cloned());
+        assert_eq!(Some(("b", (1, 0), (2, 1))), grid.get((1, 0)).cloned());
+        assert_eq!(Some(("b", (1, 0), (2, 1))), grid.get((2, 0)).cloned());
     }
 
     #[test]
     fn test_insert_overlapping() {
         let mut grid = Grid::new();
 
-        grid.insert("a", [0, 0], [2, 2]);
-        grid.insert("b", [1, 1], [2, 2]);
+        grid.insert("a", (0, 0), (2, 2));
+        grid.insert("b", (1, 1), (2, 2));
 
-        assert_eq!(None, grid.get([0, 0]));
+        assert_eq!(None, grid.get((0, 0)));
     }
 }
