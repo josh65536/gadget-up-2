@@ -118,8 +118,9 @@ impl GridItemRenderer for GadgetRenderer {
 
             self.offsets
                 .extend(&[x, y, 0.0, x, y, 0.0, x, y, 0.0, x, y, 0.0]);
-            self.colors
-                .extend(&[0.6, 0.8, 1.0, 0.7, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 1.0, 1.0]);
+            self.colors.extend(&[
+                0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
+            ]);
         }
     }
 
@@ -150,7 +151,7 @@ impl GridItemRenderer for GadgetRenderer {
             .use_attribute_vec3_float(&offsets, "offset")
             .unwrap();
         self.program
-            .use_attribute_vec3_float(&colors, "color")
+            .use_attribute_vec4_float(&colors, "color")
             .unwrap();
 
         self.program.draw_elements(&elements);

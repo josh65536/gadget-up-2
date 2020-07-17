@@ -1,6 +1,7 @@
 extern crate cgmath;
+extern crate conrod_core;
+extern crate conrod_derive;
 extern crate fnv;
-extern crate graphics;
 extern crate itertools;
 extern crate three_d;
 
@@ -10,18 +11,23 @@ mod grid;
 mod math;
 mod render;
 mod shape;
+mod ui;
 
+use conrod_core::{Ui, UiBuilder};
+use std::cell::RefCell;
 use std::rc::Rc;
 use three_d::gl::Glstruct;
+use three_d::state;
 use three_d::{vec3, vec4};
 use three_d::{Camera, Event, Screen, Window};
-use three_d::state;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use gadget::{Gadget, GadgetDef};
+use graphics_ex::GraphicsEx;
 use grid::Grid;
 use render::GadgetRenderer;
+use ui::WidgetIds;
 
 #[macro_export]
 macro_rules! log {
@@ -47,13 +53,16 @@ pub struct App {
     height: f64,
     grid: Grid<Gadget>,
     gadget_renderer: GadgetRenderer,
+    ui: Ui,
+    ids: WidgetIds,
+    ui_renderer: GraphicsEx,
 }
 
 impl App {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
 
-    pub fn new(gl: &Rc<Glstruct>) -> Self {
+    pub fn new(gl: &Rc<Glstruct>, width: u32, height: u32) -> Self {
         let camera = Camera::new_orthographic(
             &gl,
             vec3(0.0, 0.0, 0.0),
@@ -88,13 +97,23 @@ impl App {
         let size = gadget.size();
         grid.insert(gadget, (1, 2), size);
 
+        let mut ui = UiBuilder::new([width as f64, height as f64]).build();
+        let widget_ids = WidgetIds::new(ui.widget_id_generator());
+
         Self {
             gl: Rc::clone(gl),
             camera,
             height: 10.0,
             grid,
             gadget_renderer: GadgetRenderer::new(&gl),
+            ui,
+            ids: widget_ids,
+            ui_renderer: GraphicsEx::new(&gl),
         }
+    }
+
+    pub fn update(&mut self) {
+        self.update_ui();
     }
 
     pub fn render(&mut self, width: f32, height: f32) {
@@ -105,6 +124,8 @@ impl App {
         );
 
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
+
+        self.render_ui(width, height);
     }
 
     pub fn handle_input(&mut self, event: &Event) {
@@ -134,10 +155,11 @@ pub fn main_js() -> Result<(), JsValue> {
     let original_width = crate::window().inner_width().unwrap().as_f64().unwrap() as usize;
     let original_height = crate::window().inner_height().unwrap().as_f64().unwrap() as usize;
 
-    let mut app = App::new(&gl);
+    let mut app = App::new(&gl, original_width as u32, original_height as u32);
 
     state::depth_write(&gl, true);
-    state::depth_test(&gl, three_d::DepthTestType::Greater);
+    state::depth_test(&gl, three_d::DepthTestType::GreaterOrEqual);
+    state::blend(&gl, three_d::BlendType::SrcAlphaOneMinusSrcAlpha);
 
     window
         .render_loop(move |frame_input| {
@@ -149,6 +171,8 @@ pub fn main_js() -> Result<(), JsValue> {
             let height = crate::window().inner_height().unwrap().as_f64().unwrap() as f32;
 
             //log!("width: {}, height: {}", width, height);
+
+            app.update();
 
             Screen::write(
                 &gl,

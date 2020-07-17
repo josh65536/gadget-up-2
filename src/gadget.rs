@@ -4,9 +4,9 @@ use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use three_d::Vec2;
 
-use crate::math::Vector2Ex;
 use crate::grid::WH;
 use crate::log;
+use crate::math::Vector2Ex;
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 pub type Port = u32;
@@ -64,7 +64,11 @@ impl GadgetDef {
 
     /// Gets all the port-to-port traversals allowed in some state
     pub fn port_traversals_in_state(&self, state: State) -> FnvHashSet<PP> {
-        self.traversals.iter().filter(|((s, _), _)| *s == state).map(|((_, p0), (_, p1))| (*p0, *p1)).collect()
+        self.traversals
+            .iter()
+            .filter(|((s, _), _)| *s == state)
+            .map(|((_, p0), (_, p1))| (*p0, *p1))
+            .collect()
     }
 }
 
@@ -162,9 +166,9 @@ pub struct GadgetRenderInfo {
 
 impl GadgetRenderInfo {
     pub const RECTANGLE_Z: f32 = -0.001;
-    const OUTLINE_Z: f32 = -0.05;
-    const PATH_Z: f32 = -0.075;
-    const PORT_Z: f32 = -0.1;
+    const OUTLINE_Z: f32 = -0.002;
+    const PATH_Z: f32 = -0.003;
+    const PORT_Z: f32 = -0.004;
 
     fn new() -> Self {
         Self {
@@ -190,19 +194,26 @@ impl GadgetRenderInfo {
         let offset = 0.25f32;
 
         for (pos, bez) in positions.iter().zip(bezier.iter_mut()) {
-            *bez = pos + if pos.x.floor() == pos.x { // on vertical edge
-                if pos.x == 0.0 { // on left edge
-                    vec2(offset, 0.0)
-                } else { // on right edge
-                    vec2(-offset, 0.0)
+            *bez = pos
+                + if pos.x.floor() == pos.x {
+                    // on vertical edge
+                    if pos.x == 0.0 {
+                        // on left edge
+                        vec2(offset, 0.0)
+                    } else {
+                        // on right edge
+                        vec2(-offset, 0.0)
+                    }
+                } else {
+                    // on horizontal edge
+                    if pos.y == 0.0 {
+                        // on bottom edge
+                        vec2(0.0, offset)
+                    } else {
+                        // on top edge
+                        vec2(0.0, -offset)
+                    }
                 }
-            } else { // on horizontal edge
-                if pos.y == 0.0 { // on bottom edge
-                    vec2(0.0, offset)
-                } else { // on top edge
-                    vec2(0.0, -offset)
-                }
-            }
         }
 
         // Same-port traversal; make it look like a loop
@@ -227,10 +238,17 @@ impl GadgetRenderInfo {
         self.indexes.clear();
 
         // Surrounding rectangle
-        let rect = Rectangle::new(0.0, gadget.size().0 as f32, 0.0, gadget.size().1 as f32, GadgetRenderInfo::RECTANGLE_Z);
+        let rect = Rectangle::new(
+            0.0,
+            gadget.size().0 as f32,
+            0.0,
+            gadget.size().1 as f32,
+            GadgetRenderInfo::RECTANGLE_Z,
+        );
         rect.append_to(&mut self.positions, &mut self.indexes);
-        self.colors
-            .extend(&[0.6, 0.8, 1.0, 0.7, 0.9, 1.0, 0.9, 1.0, 1.0, 0.8, 1.0, 1.0]);
+        self.colors.extend(&[
+            0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
+        ]);
 
         // Port circles
         let port_positions = gadget.port_positions();
@@ -238,10 +256,10 @@ impl GadgetRenderInfo {
             let circle = Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.08);
             circle.append_to(&mut self.positions, &mut self.indexes);
             self.colors.extend(
-                [0.0, 0.0, 0.5]
+                [0.0, 0.0, 0.5, 1.0]
                     .iter()
                     .cycle()
-                    .take(circle.num_vertices() * 3),
+                    .take(circle.num_vertices() * 4),
             );
         }
 
@@ -259,8 +277,12 @@ impl GadgetRenderInfo {
                 true,
             );
             path.append_to(&mut self.positions, &mut self.indexes);
-            self.colors
-                .extend([0.0, 0.0, 0.0].iter().cycle().take(path.num_vertices() * 3));
+            self.colors.extend(
+                [0.0, 0.0, 0.0, 1.0]
+                    .iter()
+                    .cycle()
+                    .take(path.num_vertices() * 4),
+            );
         }
 
         // Paths
@@ -269,10 +291,10 @@ impl GadgetRenderInfo {
 
             path.append_to(&mut self.positions, &mut self.indexes);
             self.colors.extend(
-                [0.0, 0.0, 0.0]
+                [0.0, 0.0, 0.0, 1.0]
                     .iter()
                     .cycle()
-                    .take(path.num_vertices() * 3),
+                    .take(path.num_vertices() * 4),
             );
 
             self.paths.insert(ports, path);
