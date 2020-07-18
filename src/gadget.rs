@@ -1,12 +1,15 @@
+use cgmath::prelude::*;
 use cgmath::vec2;
 use fnv::{FnvHashMap, FnvHashSet};
-use std::cell::{Ref, RefCell};
+use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
-use three_d::Vec2;
+use three_d::gl::Glstruct;
+use three_d::{vec4, Camera, Mat4, Vec2};
 
-use crate::grid::WH;
+use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::math::Vector2Ex;
+use crate::math::{Vec2i, Vector2Ex};
+use crate::model::Model;
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 pub type Port = u32;
@@ -30,7 +33,7 @@ pub struct GadgetDef {
 
 impl GadgetDef {
     /// Constructs the "nope" gadget
-    pub fn new(num_ports: usize, num_states: usize) -> Self {
+    pub fn new(num_states: usize, num_ports: usize) -> Self {
         Self {
             num_ports,
             num_states,
@@ -39,8 +42,8 @@ impl GadgetDef {
     }
 
     pub fn from_traversals<I: IntoIterator<Item = SPSP>>(
-        num_ports: usize,
         num_states: usize,
+        num_ports: usize,
         traversals: I,
     ) -> Self {
         Self {
@@ -62,6 +65,14 @@ impl GadgetDef {
         self.traversals.iter()
     }
 
+    /// Gets all the destinations allowed in some state and port
+    pub fn targets_from_state_port<'a>(&'a self, sp: SP) -> impl Iterator<Item = SP> + 'a {
+        self.traversals
+            .iter()
+            .filter(move |((s, p), _)| *s == sp.0 && *p == sp.1)
+            .map(move |(_, (s, p))| (*s, *p))
+    }
+
     /// Gets all the port-to-port traversals allowed in some state
     pub fn port_traversals_in_state(&self, state: State) -> FnvHashSet<PP> {
         self.traversals
@@ -80,6 +91,7 @@ pub struct Gadget {
     port_map: Vec<Option<Port>>,
     state: State,
     render: RefCell<GadgetRenderInfo>,
+    dirty: Cell<bool>,
 }
 
 impl Gadget {
@@ -89,15 +101,15 @@ impl Gadget {
     /// Ports are located at midpoints of unit segments along the perimeter,
     /// starting from the bottom left and going counterclockwise. In the port map,
     /// a `None` represents the absence of a port.
-    pub fn new(def: Rc<GadgetDef>, size: WH, port_map: Vec<Option<Port>>, state: State) -> Self {
+    pub fn new(def: &Rc<GadgetDef>, size: WH, port_map: Vec<Option<Port>>, state: State) -> Self {
         let res = Self {
-            def,
+            def: Rc::clone(def),
             size,
             port_map,
             state,
             render: RefCell::new(GadgetRenderInfo::new()),
+            dirty: Cell::new(true),
         };
-        res.update_render();
         res
     }
 
@@ -109,8 +121,70 @@ impl Gadget {
         self.size
     }
 
+    pub fn port(&self, index: usize) -> Option<Port> {
+        self.port_map[index]
+    }
+
     pub fn state(&self) -> State {
         self.state
+    }
+
+    pub fn set_state(&mut self, state: State) {
+        self.state = state;
+        self.dirty.set(true);
+    }
+
+    fn port_map_inv(&self) -> FnvHashMap<Port, usize> {
+        self.port_map
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.is_some())
+            .map(|(i, p)| (p.unwrap(), i))
+            .collect()
+    }
+
+    /// Gets the traversals allowed in the current state, at some port
+    /// in back, right, front, left order relative to some facing direction
+    pub fn targets_from_state_port_brfl(&self, port: Port, direction: XY) -> [Vec<SP>; 4] {
+        let offset = if direction.x == 0 {
+            if direction.y > 0 {
+                0
+            } else {
+                2
+            }
+        } else {
+            if direction.x > 0 {
+                1
+            } else {
+                3
+            }
+        };
+
+        let mut arr = [vec![], vec![], vec![], vec![]];
+        let (w, h) = self.size();
+        let map = self.port_map_inv();
+
+        for sp in self.def().targets_from_state_port((self.state(), port)) {
+            let (_, port) = sp;
+            let idx = map[&port];
+
+            if (idx as u32) < w + h {
+                if (idx as u32) < w {
+                    &mut arr[(0 + offset) % 4]
+                } else {
+                    &mut arr[(1 + offset) % 4]
+                }
+            } else {
+                if (idx as u32) < w + h + w {
+                    &mut arr[(2 + offset) % 4]
+                } else {
+                    &mut arr[(3 + offset) % 4]
+                }
+            }
+            .push(sp);
+        }
+
+        arr
     }
 
     fn potential_port_positions(&self) -> Vec<Vec2> {
@@ -124,6 +198,24 @@ impl Gadget {
             )
             .chain((0..self.size.1).rev().map(|i| vec2(0.0, 0.5 + i as f32)))
             .collect()
+    }
+
+    /// Rotates the ports of the gadget by some number of spaces.
+    /// A positive number means counterclockwise,
+    /// a negative number means clockwise.
+    pub fn rotate_ports(&mut self, num_spaces: i32) {
+        self.dirty.set(true);
+        let rem = (-num_spaces).rem_euclid(self.port_map.len() as i32);
+
+        let len = self.port_map.len();
+        self.port_map = self
+            .port_map
+            .iter()
+            .cycle()
+            .skip(rem as usize)
+            .take(len)
+            .copied()
+            .collect();
     }
 
     /// Gets the positions of the ports of this gadget in port order.
@@ -150,7 +242,24 @@ impl Gadget {
     }
 
     pub fn renderer(&self) -> Ref<GadgetRenderInfo> {
+        if self.dirty.get() {
+            self.dirty.set(false);
+            self.update_render();
+        }
         self.render.borrow()
+    }
+}
+
+impl Clone for Gadget {
+    fn clone(&self) -> Self {
+        Self {
+            def: Rc::clone(&self.def),
+            size: self.size,
+            port_map: self.port_map.clone(),
+            state: self.state,
+            render: self.render.clone(),
+            dirty: self.dirty.clone(),
+        }
     }
 }
 
@@ -162,6 +271,7 @@ pub struct GadgetRenderInfo {
     /// 3 indexes per triangle
     indexes: Vec<u32>,
     paths: FnvHashMap<PP, Path>,
+    model: RefCell<Option<Model>>,
 }
 
 impl GadgetRenderInfo {
@@ -176,6 +286,7 @@ impl GadgetRenderInfo {
             colors: vec![],
             indexes: vec![],
             paths: FnvHashMap::default(),
+            model: RefCell::new(None),
         }
     }
 
@@ -227,7 +338,7 @@ impl GadgetRenderInfo {
         Path::from_bezier3(
             [positions[0], bezier[0], bezier[1], positions[1]],
             GadgetRenderInfo::PATH_Z,
-            0.08,
+            0.05,
         )
     }
 
@@ -235,6 +346,7 @@ impl GadgetRenderInfo {
     /// that it is correct when rendering
     fn update(&mut self, gadget: &Gadget) {
         self.positions.clear();
+        self.colors.clear();
         self.indexes.clear();
 
         // Surrounding rectangle
@@ -299,10 +411,36 @@ impl GadgetRenderInfo {
 
             self.paths.insert(ports, path);
         }
+
+        // Wait until we need the model
+        *self.model.borrow_mut() = None;
     }
 
     pub fn colors(&self) -> &Vec<f32> {
         &self.colors
+    }
+
+    pub fn model(&self, gl: &Rc<Glstruct>) -> Ref<Model> {
+        {
+            let mut model = self.model.borrow_mut();
+
+            if model.is_none() {
+                *model = Some(Model::new(gl, &self.positions, &self.colors, &self.indexes));
+            }
+        }
+        Ref::map(self.model.borrow(), |m| m.as_ref().unwrap())
+    }
+}
+
+impl Clone for GadgetRenderInfo {
+    fn clone(&self) -> Self {
+        Self {
+            positions: self.positions.clone(),
+            colors: self.colors.clone(),
+            indexes: self.indexes.clone(),
+            paths: self.paths.clone(),
+            model: RefCell::new(None),
+        }
     }
 }
 
@@ -320,13 +458,145 @@ impl Shape for GadgetRenderInfo {
     }
 }
 
+/// Walks around in a maze of gadgets
+pub struct Agent {
+    /// Double the position, because then it's integers
+    double_xy: XY,
+    /// either (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), or (0.0, -1.0)
+    direction: Vec2i,
+    /// rendering, of course
+    model: Rc<Model>,
+}
+
+impl Agent {
+    pub fn new(position: Vec2, direction: Vec2i, model: &Rc<Model>) -> Self {
+        let double_xy = vec2(
+            (position.x * 2.0).round() as i32,
+            (position.y * 2.0).round() as i32,
+        );
+
+        Self {
+            double_xy,
+            direction,
+            model: Rc::clone(model),
+        }
+    }
+
+    pub fn set_position(&mut self, position: Vec2) {
+        self.double_xy = vec2(
+            (position.x * 2.0).round() as i32,
+            (position.y * 2.0).round() as i32,
+        );
+    }
+
+    pub fn rotate(&mut self, num_right_turns: i32) {
+        for _ in 0..(num_right_turns.rem_euclid(4)) {
+            self.direction = self.direction.right_ccw();
+        }
+    }
+
+    /// Advances the agent according to internal rules
+    pub fn advance(&mut self, grid: &mut Grid<Gadget>, input: Vec2i) {
+        if input.dot_ex(self.direction) == -1 {
+            // Turn around, that's it
+            self.direction *= -1;
+            return;
+        }
+
+        if let Some((gadget, xy, (w, h), idx)) =
+            grid.get_item_touching_edge_mut(self.double_xy, self.direction)
+        {
+            if let Some(port) = gadget.port(idx) {
+                let [back, right, front, left] =
+                    gadget.targets_from_state_port_brfl(port, self.direction);
+
+                // TODO: Make this more sophisticated; don't just take the first traversal
+
+                let sp;
+
+                if input.dot_ex(self.direction) == 1 {
+                    // Forward
+                    sp = front
+                        .first()
+                        .or_else(|| left.first().xor(right.first()))
+                        .or_else(|| back.first());
+                } else if self.direction.right_ccw() == input {
+                    // Left
+                    sp = left.first();
+                } else if input.dot_ex(self.direction) == -1 {
+                    // Back
+                    // TODO: Unreachable right now
+                    sp = None;
+                } else {
+                    // Right
+                    sp = right.first();
+                }
+
+                if let Some((s1, p1)) = sp {
+                    let pos2 = (gadget.port_positions()[*p1 as usize] * 2.0)
+                        .cast::<i32>()
+                        .unwrap();
+                    self.direction = if pos2.x.rem_euclid(2) != 0 {
+                        if pos2.y == 0 {
+                            // Bottom
+                            vec2(0, -1)
+                        } else {
+                            // Top
+                            vec2(0, 1)
+                        }
+                    } else {
+                        if pos2.x == 0 {
+                            // Left
+                            vec2(-1, 0)
+                        } else {
+                            // Right
+                            vec2(1, 0)
+                        }
+                    };
+
+                    self.double_xy = xy * 2 + pos2;
+                    gadget.set_state(*s1);
+                }
+            }
+        }
+    }
+
+    pub fn render(&self, camera: &Camera) {
+        let dir = self.direction.cast::<f32>().unwrap();
+
+        let transform = Mat4::from_cols(
+            -dir.right_ccw().extend(0.0).extend(0.0),
+            dir.extend(0.0).extend(0.0),
+            vec4(0.0, 0.0, 0.0, 1.0),
+            (self.double_xy.cast::<f32>().unwrap() * 0.5)
+                .extend(0.0)
+                .extend(1.0),
+        );
+        self.model.render(transform, camera);
+    }
+
+    /// Returns the model that an agent uses
+    pub fn new_shared_model(gl: &Rc<Glstruct>) -> Model {
+        let positions: Vec<f32> = vec![
+            0.1, -0.1, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1, 0.0, -0.1, 0.0, 0.0, -0.1, -0.1, 0.0,
+        ];
+        let colors: Vec<f32> = vec![
+            0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0,
+            0.8, 0.0, 1.0,
+        ];
+        let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
+
+        Model::new(gl, &positions, &colors, &indexes)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_nope() {
-        let def = GadgetDef::new(3, 4);
+        let def = GadgetDef::new(4, 3);
         assert_eq!(3, def.num_ports());
         assert_eq!(4, def.num_states());
         assert_eq!(0, def.traversals().count());

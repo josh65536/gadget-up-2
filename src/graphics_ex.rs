@@ -1,27 +1,29 @@
 use conrod_core::render::{Primitive, PrimitiveKind, PrimitiveWalker};
+use conrod_core::Widget;
 use std::rc::Rc;
 use three_d::gl::Glstruct;
 use three_d::{vec3, Camera, ElementBuffer, Program, VertexBuffer};
 
 use crate::log;
 use crate::shape::{Rectangle, Shape};
+use crate::widget::triangles3d::Triangles3d;
 
 pub struct GraphicsEx {
     gl: Rc<Glstruct>,
-    camera: Camera,
+    pub camera: Camera,
     program: Program,
     /// 3 coordinates (XYZ) per vertex
-    positions: Vec<f32>,
+    pub positions: Vec<f32>,
     /// 3 coordinates (XYZ) per offset
-    offsets: Vec<f32>,
+    pub offsets: Vec<f32>,
     /// 4 components (RGBA) per color
-    colors: Vec<f32>,
+    pub colors: Vec<f32>,
     /// 3 indexes per triangle
-    indexes: Vec<u32>,
+    pub indexes: Vec<u32>,
 }
 
 impl GraphicsEx {
-    const UI_Z_BASE: f32 = -0.9;
+    pub const UI_Z_BASE: f32 = -0.9;
 
     pub fn new(gl: &Rc<Glstruct>) -> Self {
         // dummy values
@@ -37,8 +39,8 @@ impl GraphicsEx {
 
         let program = Program::from_source(
             gl,
-            include_str!("../assets/shaders/color.vert"),
-            include_str!("../assets/shaders/color.frag"),
+            include_str!("../assets/shaders/offset.vert"),
+            include_str!("../assets/shaders/basic.frag"),
         )
         .unwrap();
 
@@ -57,7 +59,7 @@ impl GraphicsEx {
     pub fn draw_begin(&mut self, width: f32, height: f32) {
         self.positions.clear();
         self.offsets.clear();
-        self.indexes.clear();
+        self.colors.clear();
         self.indexes.clear();
         self.camera.set_orthographic_projection(width, height, 1.0);
     }
@@ -192,7 +194,13 @@ impl GraphicsEx {
                 unimplemented!("Text is not supported");
             }
 
-            PrimitiveKind::Other(widget) => {}
+            PrimitiveKind::Other(widget) => {
+                if widget.type_id == std::any::TypeId::of::<<Triangles3d as Widget>::State>() {
+                    if let Some(ss) = widget.unique_widget_state::<Triangles3d>() {
+                        ss.state.render(self);
+                    }
+                }
+            }
         }
     }
 }

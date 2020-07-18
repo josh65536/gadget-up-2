@@ -21,6 +21,7 @@ pub trait Shape {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Rectangle {
     min_x: f32,
     max_x: f32,
@@ -58,6 +59,7 @@ impl Shape for Rectangle {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Circle {
     x: f32,
     y: f32,
@@ -105,6 +107,7 @@ impl Shape for Circle {
     }
 }
 
+#[derive(Clone, Debug)]
 /// A series of line segments
 pub struct Path {
     xys: Vec<Vec2>,

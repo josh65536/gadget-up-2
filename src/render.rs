@@ -66,8 +66,8 @@ impl GadgetRenderer {
     pub fn new(gl: &Rc<Glstruct>) -> Self {
         let program = Program::from_source(
             gl,
-            include_str!("../assets/shaders/color.vert"),
-            include_str!("../assets/shaders/color.frag"),
+            include_str!("../assets/shaders/offset.vert"),
+            include_str!("../assets/shaders/basic.frag"),
         )
         .unwrap();
 
@@ -82,8 +82,8 @@ impl GadgetRenderer {
     }
 
     pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, size: WH) {
-        let x = position.0 as f32;
-        let y = position.1 as f32;
+        let x = position.x as f32;
+        let y = position.y as f32;
 
         let renderer = gadget.renderer();
 
@@ -110,8 +110,8 @@ impl GridItemRenderer for GadgetRenderer {
         if let Some(gadget) = item {
             self.render_gadget(gadget, position, size);
         } else {
-            let x = position.0 as f32;
-            let y = position.1 as f32;
+            let x = position.x as f32;
+            let y = position.y as f32;
 
             let rect = Rectangle::new(0.0, 1.0, 0.0, 1.0, GadgetRenderInfo::RECTANGLE_Z);
             rect.append_to(&mut self.positions, &mut self.indexes);
