@@ -81,7 +81,7 @@ impl<T> Grid<T> {
 
         debug_assert!(x_mis != y_mis, "Not on an edge!");
 
-        let mut xy = vec2(double_xy.x / 2, double_xy.y / 2);
+        let mut xy = vec2(double_xy.x.div_euclid(2), double_xy.y.div_euclid(2));
         if direction.x < 0 {
             xy.x -= 1;
         }
@@ -90,6 +90,13 @@ impl<T> Grid<T> {
         }
 
         if let Some((t, min_xy, (w, h))) = self.get_mut(xy) {
+            if direction.x < 0 {
+                xy.x += 1;
+            }
+            if direction.y < 0 {
+                xy.y += 1;
+            }
+
             Some((
                 t,
                 min_xy,

@@ -18,7 +18,7 @@ mod shape;
 mod ui;
 mod widget;
 
-use cgmath::vec2;
+use cgmath::{vec2, Vector2};
 use conrod_core::{Ui, UiBuilder};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -57,6 +57,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub struct App {
     gl: Rc<Glstruct>,
     camera: Camera,
+    center: Vector2<f64>,
     height: f64,
     grid: Grid<Gadget>,
     gadget_renderer: GadgetRenderer,
@@ -69,6 +70,7 @@ pub struct App {
     agent: Option<Agent>,
     agent_position: Vec2,
     agent_model: Rc<Model>,
+    gadget_select_rep: Gadget,
     mode: Mode,
     ids: WidgetIds,
     ui_renderer: GraphicsEx,
@@ -113,25 +115,15 @@ impl App {
         //let size = gadget.size();
         //grid.insert(gadget, (1, 2), size);
 
-        let def = GadgetDef::from_traversals(
-            1,
-            3,
-            vec![((0, 0), (0, 1)), ((0, 1), (0, 2)), ((0, 2), (0, 0))],
-        );
-
-        let gadget = Gadget::new(
-            &Rc::new(def),
-            (1, 1),
-            vec![Some(0), Some(1), None, Some(2)],
+        let def = GadgetDef::new(
+            2,
             0,
         );
 
-        let def = GadgetDef::from_traversals(1, 4, vec![((0, 0), (0, 2)), ((0, 1), (0, 3))]);
-
-        let gadget2 = Gadget::new(
+        let gadget_select_rep = Gadget::new(
             &Rc::new(def),
             (1, 1),
-            vec![Some(0), Some(1), Some(2), Some(3)],
+            vec![],
             0,
         );
 
@@ -140,6 +132,7 @@ impl App {
         Self {
             gl: Rc::clone(gl),
             camera,
+            center: vec2(0.0, 0.0),
             height: 10.0,
             grid,
             gadget_renderer: GadgetRenderer::new(&gl),
@@ -150,6 +143,7 @@ impl App {
             agent: None,
             agent_position: vec2(0.0, 0.0),
             agent_model: Rc::new(Agent::new_shared_model(gl)),
+            gadget_select_rep,
             mode: Mode::None,
             ids: widget_ids,
             ui_renderer: GraphicsEx::new(&gl),
@@ -164,6 +158,10 @@ impl App {
         );
 
         self.update_ui(ui);
+
+        let cx = self.center.x as f32;
+        let cy = self.center.y as f32;
+        self.camera.set_view(vec3(cx, cy, 0.0), vec3(cx, cy, -1.0), vec3(0.0, 1.0, 0.0));
     }
 
     pub fn render(&mut self, ui: &mut Ui, width: f32, height: f32) {
@@ -180,6 +178,10 @@ impl App {
             );
         }
 
+        if let Some(agent) = &self.agent {
+            agent.render(&self.camera);
+        }
+
         self.render_ui(ui, width, height);
     }
 
@@ -192,16 +194,48 @@ impl App {
             }
 
             Event::Key { state, kind } => {
-                if kind == "R" {
+                if kind == "R" || kind == "T" {
                     if let three_d::State::Pressed = state {
                         if let Some(gadget) = &mut self.gadget_tile {
-                            gadget.rotate_ports(1);
+                            gadget.rotate_ports(if kind == "R" {1} else {-1});
                         }
 
                         if self.mode == Mode::AgentPlace {
                             if let Some(agent) = &mut self.agent {
                                 agent.rotate(1);
                             }
+                        }
+                    }
+                } else if kind == "F" {
+                    if let three_d::State::Pressed = state {
+                        if let Some(gadget) = &mut self.gadget_tile {
+                            gadget.flip_ports();
+                        }
+                    }
+                } else if kind == "C" {
+                    if let three_d::State::Pressed = state {
+                        if let Some(gadget) = &mut self.gadget_tile {
+                            gadget.cycle_state();
+                        }
+                    }
+                }
+
+                if self.mode == Mode::Play {
+                    if let three_d::State::Pressed = state {
+                        let dir = if kind == "W" || kind == "ArrowUp" {
+                            Some(vec2(0, 1))
+                        } else if kind == "A" || kind == "ArrowLeft" {
+                            Some(vec2(-1, 0))
+                        } else if kind == "S" || kind == "ArrowDown" {
+                            Some(vec2(0, -1))
+                        } else if kind == "D" || kind == "ArrowRight" {
+                            Some(vec2(1, 0))
+                        } else {
+                            None
+                        };
+
+                        if let Some(dir) = dir {
+                            self.agent.as_mut().unwrap().advance(&mut self.grid, dir);
                         }
                     }
                 }

@@ -25,6 +25,7 @@ pub type PP = (Port, Port);
 pub type SPSP = (SP, SP);
 
 /// Definition of a gadget, including ports, states, and transitions
+#[derive(Clone, Debug)]
 pub struct GadgetDef {
     num_ports: usize,
     num_states: usize,
@@ -218,6 +219,18 @@ impl Gadget {
             .collect();
     }
 
+    /// Temporary function to flip ports; in a hurry
+    pub fn flip_ports(&mut self) {
+        self.dirty.set(true);
+        self.port_map.reverse();
+    }
+
+    /// Adds 1 to the state; resetting it to 0 in case of overflow
+    pub fn cycle_state(&mut self) {
+        self.dirty.set(true);
+        self.set_state((self.state + 1) % self.def.num_states() as State);
+    }
+
     /// Gets the positions of the ports of this gadget in port order.
     /// The positions are relative to the bottom-left corner.
     pub fn port_positions(&self) -> Vec<Vec2> {
@@ -348,6 +361,8 @@ impl GadgetRenderInfo {
         self.positions.clear();
         self.colors.clear();
         self.indexes.clear();
+        self.paths.clear();
+        *self.model.borrow_mut() = None;
 
         // Surrounding rectangle
         let rect = Rectangle::new(
@@ -365,10 +380,10 @@ impl GadgetRenderInfo {
         // Port circles
         let port_positions = gadget.port_positions();
         for vec in port_positions.iter() {
-            let circle = Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.08);
+            let circle = Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.05);
             circle.append_to(&mut self.positions, &mut self.indexes);
             self.colors.extend(
-                [0.0, 0.0, 0.5, 1.0]
+                [0.0, 0.0, 0.75, 1.0]
                     .iter()
                     .cycle()
                     .take(circle.num_vertices() * 4),
@@ -401,19 +416,36 @@ impl GadgetRenderInfo {
         for ports in gadget.def().port_traversals_in_state(gadget.state()) {
             let path = GadgetRenderInfo::port_path(ports, &port_positions);
 
-            path.append_to(&mut self.positions, &mut self.indexes);
-            self.colors.extend(
-                [0.0, 0.0, 0.0, 1.0]
-                    .iter()
-                    .cycle()
-                    .take(path.num_vertices() * 4),
-            );
-
             self.paths.insert(ports, path);
         }
 
-        // Wait until we need the model
-        *self.model.borrow_mut() = None;
+        for ((p0, p1), path) in &self.paths {
+            let directed = self.paths.get(&(*p1, *p0)).is_none();
+
+            // No redundant path drawing!
+            if p0 <= p1 || directed {
+                path.append_to(&mut self.positions, &mut self.indexes);
+                self.colors.extend(
+                    [0.0, 0.0, 0.0, 1.0]
+                        .iter()
+                        .cycle()
+                        .take(path.num_vertices() * 4),
+                );
+            }
+
+            if directed {
+                let dir = path.end_direction();
+                let end = port_positions[*p1 as usize];
+
+                let v0 = end + dir * -0.2 + dir.right_ccw() * -0.1;
+                let v2 = end + dir * -0.2 + dir.right_ccw() * 0.1;
+
+                let old_len = self.positions().len() as u32 / 3;
+                self.positions.extend(&[v0.x, v0.y, GadgetRenderInfo::PATH_Z, end.x, end.y, GadgetRenderInfo::PATH_Z, v2.x, v2.y, GadgetRenderInfo::PATH_Z]);
+                self.colors.extend([0.0, 0.0, 0.0, 1.0].iter().cycle().take(4 * 3));
+                self.indexes.extend(&[old_len, old_len + 1, old_len + 2]);
+            }
+        }
     }
 
     pub fn colors(&self) -> &Vec<f32> {
@@ -567,9 +599,9 @@ impl Agent {
         let transform = Mat4::from_cols(
             -dir.right_ccw().extend(0.0).extend(0.0),
             dir.extend(0.0).extend(0.0),
-            vec4(0.0, 0.0, 0.0, 1.0),
+            vec4(0.0, 0.0, 1.0, 0.0),
             (self.double_xy.cast::<f32>().unwrap() * 0.5)
-                .extend(0.0)
+                .extend(-0.1)
                 .extend(1.0),
         );
         self.model.render(transform, camera);
@@ -578,7 +610,7 @@ impl Agent {
     /// Returns the model that an agent uses
     pub fn new_shared_model(gl: &Rc<Glstruct>) -> Model {
         let positions: Vec<f32> = vec![
-            0.1, -0.1, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1, 0.0, -0.1, 0.0, 0.0, -0.1, -0.1, 0.0,
+            0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15, 0.0,
         ];
         let colors: Vec<f32> = vec![
             0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0,

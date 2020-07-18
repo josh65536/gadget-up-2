@@ -23,6 +23,9 @@ module.exports = {
 
     new WasmPackPlugin({
       crateDirectory: __dirname,
+      wasmopt: {
+        snipRustPanickingCode: true
+      }
     }),
   ]
 };

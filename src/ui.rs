@@ -1,4 +1,4 @@
-use conrod_core::position::{Align, Place, Relative};
+use conrod_core::position::{Align, Place, Relative, Direction};
 use conrod_core::render::PrimitiveWalker;
 use conrod_core::widget::{self, bordered_rectangle, BorderedRectangle, matrix, Matrix};
 use conrod_core::widget_ids;
@@ -6,6 +6,7 @@ use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
 use conrod_core::{Ui, UiBuilder};
 use cgmath::vec2;
 
+use crate::shape::Shape;
 use crate::log;
 use crate::gadget::Agent;
 use crate::widget::{screen, ContraptionScreen, SelectionGrid, Triangles3d, Button};
@@ -13,7 +14,7 @@ use crate::App;
 
 widget_ids! {
     pub struct WidgetIds {
-        rect, contraption_screen, menu, agent,
+        rect, contraption_screen, menu, gadget_select, agent,
     }
 }
 
@@ -56,7 +57,12 @@ impl App {
             match event {
                 screen::Event::TilePaint(xy) => {
                     if let Some(gadget) = &self.gadget_tile {
-                        self.grid.insert(gadget.clone(), xy, gadget.size());
+                        // Nope gadget is special
+                        if gadget.def().num_states() == 1 && gadget.def().num_ports() == 0 && gadget.size() == (1, 1) {
+                            self.grid.remove(xy);
+                        } else {
+                            self.grid.insert(gadget.clone(), xy, gadget.size());
+                        }
                     }
                 }
 
@@ -80,6 +86,9 @@ impl App {
                     }
                 }
 
+                screen::Event::Pan(xy) => {
+                    self.center += xy;
+                }
                 _ => {}
             }
         }
@@ -106,8 +115,18 @@ impl App {
         //    .set(self.ids.menu_mtx, &mut ui).next(&mut ui)
         //{
         {
+            for _ in Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep))
+                .x_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
+                .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
+                .w(App::MENU_HEIGHT - 6.0)
+                .h(34.0)
+                .set(self.ids.gadget_select, &mut ui)
+            {
+                self.set_mode(Mode::TilePaint);
+            }
+
             let positions: Vec<f32> = vec![
-                0.1, -0.1, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1, 0.0, -0.1, 0.0, 0.0, -0.1, -0.1, 0.0,
+                0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15, 0.0,
             ];
             let colors: Vec<f32> = vec![
                 0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0,
@@ -115,8 +134,8 @@ impl App {
             ];
             let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
 
-            for _ in Button::triangles(Triangles3d::new(positions, colors, indexes, vec2(0.0, 0.0), 0.2, 0.2))
-                .x_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
+            for _ in Button::triangles(Triangles3d::new(positions, colors, indexes, vec2(0.0, 0.0), 0.3, 0.3))
+                .x_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(App::MENU_HEIGHT))))
                 .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
                 .w(App::MENU_HEIGHT - 6.0)
                 .h(34.0)
@@ -135,7 +154,7 @@ impl App {
                 .outer_padding(5.0)
                 .x_position_relative_to(ui.window, Relative::Place(Place::Start(Some(10.0))))
                 .y_position_relative_to(ui.window, Relative::Place(Place::Start(Some(10.0))))
-                .w(300.0)
+                .w(250.0)
                 .padded_h_of(ui.window, App::MENU_HEIGHT / 2.0 + 10.0)
                 .set(self.ids.rect, &mut ui);
 

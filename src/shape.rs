@@ -152,6 +152,14 @@ impl Path {
             closed: false,
         }
     }
+
+    pub fn start_direction(&self) -> Vec2 {
+        (self.xys[1] - self.xys[0]).normalize()
+    }
+
+    pub fn end_direction(&self) -> Vec2 {
+        (self.xys[self.xys.len() - 1] - self.xys[self.xys.len() - 2]).normalize()
+    }
 }
 
 impl Shape for Path {

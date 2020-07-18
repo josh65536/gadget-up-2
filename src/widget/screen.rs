@@ -1,4 +1,4 @@
-use cgmath::{vec2, vec1};
+use cgmath::{vec2, Vector2};
 use cgmath::prelude::*;
 use conrod_core::image;
 use conrod_core::input::widget::Mouse;
@@ -37,7 +37,8 @@ bitfield! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct Input(u32) {
         left, is_left, set_left: 0,
-        right, is_right, set_right: 1,
+        middle, is_middle, set_middle: 1,
+        right, is_right, set_right: 2,
     }
 }
 
@@ -52,6 +53,7 @@ pub struct State {
     prev_input_raw: Input,
     pressed_raw: Input,
     position: Point,
+    prev_position: Point,
     ids: Ids,
     /// To make sure we don't send a million tile paint events of the same value
     last_tile_event: Option<Event>,
@@ -78,9 +80,11 @@ impl<'a> ContraptionScreen<'a> {
         h: f64,
     ) {
         state.prev_input_raw = state.input_raw;
+        state.prev_position = state.position;
 
         if let Some(mouse) = mouse {
             state.input_raw.set_left(mouse.buttons.left().is_down());
+            state.input_raw.set_middle(mouse.buttons.middle().is_down());
             state.input_raw.set_right(mouse.buttons.right().is_down());
 
             let [mut x, mut y] = mouse.rel_xy();
@@ -91,6 +95,7 @@ impl<'a> ContraptionScreen<'a> {
             state.position = [position.x as f64, position.y as f64];
         } else {
             state.input_raw.set_left(false);
+            state.input_raw.set_middle(false);
             state.input_raw.set_right(false);
         }
 
@@ -110,6 +115,8 @@ impl<'a> ContraptionScreen<'a> {
         } else if !state.input_raw.is_left() {
             state.input.set_left(false);
         }
+
+        state.input.set_middle(state.input_raw.is_middle());
 
         if state.pressed_raw.is_right() {
             state.input.set_right(true);
@@ -176,20 +183,17 @@ impl<'a> ContraptionScreen<'a> {
                 if mouse.is_over() {
                     let (w, h) = rect.w_h();
 
-                    let mut x_off: f32 = state.position[0] as f32 * 2.0;
-                    let mut y_off: f32 = state.position[1] as f32 * 2.0;
+                    let [mut x, mut y] = state.position;
+                    x -= 1.0;
 
-                    let mut x = x_off.round() / 2.0;
-                    let mut y = y_off.round() / 2.0;
-                    
-                    x_off = x_off - x_off.round();
-                    y_off = y_off - y_off.round();
+                    let mut xx = state.position[0] - state.position[1];
+                    let mut yy = state.position[0] + state.position[1];
 
-                    if x_off.abs() > y_off.abs() {
-                        x += vec1(x_off).normalize_to(0.5).x;
-                    } else {
-                        y += vec1(y_off).normalize_to(0.5).x;
-                    }
+                    xx = xx.round();
+                    yy = yy.round();
+
+                    let x = ((xx + yy) * 0.5 + 0.5) as f32;
+                    let y = ((-xx + yy) * 0.5) as f32;
 
                     if state.pressed.is_left() {
                         events.push(Event::AgentPlace(vec2(x, y)));
@@ -216,6 +220,8 @@ pub enum Event {
     AgentPlace(Vec2),
     /// Mouse moved over (X, Y) in agent place mode
     AgentHover(Vec2),
+    /// Screen panned by a difference of (X, Y)
+    Pan(Vector2<f64>),
 }
 
 impl<'a> Widget for ContraptionScreen<'a> {
@@ -233,6 +239,7 @@ impl<'a> Widget for ContraptionScreen<'a> {
             prev_input_raw: Input::zero(),
             pressed_raw: Input::zero(),
             position: [0.0, 0.0],
+            prev_position: [0.0, 0.0],
             ids: Ids::new(id_gen),
             last_tile_event: None,
         }
@@ -256,10 +263,21 @@ impl<'a> Widget for ContraptionScreen<'a> {
             )
         });
 
-        match self.mode {
+        let mut vec = vec![];
+
+        if args.state.input.is_middle() && args.state.position != args.state.prev_position {
+            vec.push(Event::Pan(vec2(args.state.prev_position[0], args.state.prev_position[1]) - vec2(args.state.position[0], args.state.position[1])));
+            args.state.update(|state| {
+                state.position = state.prev_position;
+            })
+        }
+
+        vec.append(&mut match self.mode {
             Mode::TilePaint => self.update_paint_tile(args),
             Mode::AgentPlace => self.update_place_agent(args),
             _ => vec![]
-        }
+        });
+
+        vec
     }
 }
