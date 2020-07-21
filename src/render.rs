@@ -1,11 +1,12 @@
 use crate::camera::Camera;
 use crate::gadget::{Gadget, GadgetRenderInfo};
 use crate::grid::{Grid, WH, XY};
+
 use crate::log;
 use crate::math::ToArray;
 use crate::shape::{Rectangle, Shape};
 
-use golem::Dimension::{D2, D3, D4};
+use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
@@ -103,7 +104,7 @@ impl GadgetRenderer {
         }
     }
 
-    pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, size: WH) {
+    pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, _size: WH) {
         let x = position.x as f32;
         let y = position.y as f32;
 
@@ -176,7 +177,7 @@ impl GridItemRenderer for GadgetRenderer {
                 &self.index_buffer,
                 0..self.indexes.len(),
                 GeometryMode::Triangles,
-            );
+            ).unwrap();
         }
     }
 }

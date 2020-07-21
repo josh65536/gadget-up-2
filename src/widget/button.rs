@@ -73,7 +73,7 @@ impl<'a> Widget for Button<'a, Triangles> {
         let widget::UpdateArgs {
             id,
             state,
-            style,
+            style: _,
             rect,
             ui,
             ..
@@ -90,7 +90,7 @@ impl<'a> Widget for Button<'a, Triangles> {
             .graphics_for(id)
             .set(state.triangles, ui);
 
-        let (interaction, times_triggered) =
+        let (_interaction, times_triggered) =
             widget::button::interaction_and_times_triggered(id, ui);
 
         widget::button::TimesClicked(times_triggered)

@@ -5,7 +5,7 @@ use conrod_derive::WidgetCommon;
 
 use crate::gadget::Gadget;
 use crate::graphics_ex::GraphicsEx;
-use crate::log;
+
 use crate::math::Vec2;
 use crate::shape::Shape;
 
@@ -100,7 +100,7 @@ impl Widget for Triangles3d {
     type Style = ();
     type Event = ();
 
-    fn init_state(&self, id: widget::id::Generator) -> Self::State {
+    fn init_state(&self, _id: widget::id::Generator) -> Self::State {
         State::new()
     }
 

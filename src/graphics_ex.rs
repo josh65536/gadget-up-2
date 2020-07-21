@@ -1,7 +1,7 @@
 use cgmath::vec3;
-use conrod_core::render::{Primitive, PrimitiveKind, PrimitiveWalker};
+use conrod_core::render::{Primitive, PrimitiveKind};
 use conrod_core::Widget;
-use golem::Dimension::{D2, D3, D4};
+use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
@@ -117,12 +117,12 @@ impl GraphicsEx {
                 &self.index_buffer,
                 0..self.indexes.len(),
                 GeometryMode::Triangles,
-            );
+            ).unwrap();
         }
     }
 
     pub fn primitive(&mut self, p: Primitive) {
-        let Primitive { id, kind, rect, .. } = p;
+        let Primitive { id: _, kind, rect, .. } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
 
@@ -211,17 +211,17 @@ impl GraphicsEx {
             }
 
             PrimitiveKind::Image {
-                image_id,
-                color,
-                source_rect,
+                image_id: _,
+                color: _,
+                source_rect: _,
             } => {
                 unimplemented!("Images are not supported");
             }
 
             PrimitiveKind::Text {
-                color,
-                text,
-                font_id,
+                color: _,
+                text: _,
+                font_id: _,
             } => {
                 unimplemented!("Text is not supported");
             }

@@ -1,10 +1,10 @@
 use cgmath::prelude::*;
 use cgmath::{vec2, vec4, Vector2};
-use conrod_core::image;
+
 use conrod_core::input::widget::Mouse;
 use conrod_core::widget::{self, Widget};
 use conrod_core::Point;
-use conrod_core::{utils, widget_ids};
+use conrod_core::{widget_ids};
 use conrod_core::{Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
@@ -12,7 +12,7 @@ use crate::camera::Camera;
 use crate::grid::XY;
 use crate::math::Vec2;
 use crate::ui::Mode;
-use crate::{bitfield, log};
+use crate::{bitfield};
 
 widget_ids! {
     pub struct Ids {
@@ -136,7 +136,7 @@ impl<'a> ContraptionScreen<'a> {
         let rect = args.rect;
         let ui = args.ui;
 
-        let Self { camera, .. } = self;
+        let Self { camera: _, .. } = self;
 
         let mut events = vec![];
 
@@ -147,7 +147,7 @@ impl<'a> ContraptionScreen<'a> {
 
             if let Some(mouse) = ui.widget_input(id).mouse() {
                 if mouse.is_over() {
-                    let (w, h) = rect.w_h();
+                    let (_w, _h) = rect.w_h();
 
                     let x = state.position[0].floor() as i32;
                     let y = state.position[1].floor() as i32;
@@ -174,20 +174,20 @@ impl<'a> ContraptionScreen<'a> {
         let rect = args.rect;
         let ui = args.ui;
 
-        let Self { camera, .. } = self;
+        let Self { camera: _, .. } = self;
 
         let mut events = vec![];
 
         state.update(|state| {
             if let Some(mouse) = ui.widget_input(id).mouse() {
                 if mouse.is_over() {
-                    let (w, h) = rect.w_h();
+                    let (_w, _h) = rect.w_h();
 
-                    let [mut x, mut y] = state.position;
-                    x -= 1.0;
+                    let [mut x, y] = state.position;
+                    x -= 0.5;
 
-                    let mut xx = state.position[0] - state.position[1];
-                    let mut yy = state.position[0] + state.position[1];
+                    let mut xx = x - y;
+                    let mut yy = x + y;
 
                     xx = xx.round();
                     yy = yy.round();
@@ -214,8 +214,6 @@ pub enum Event {
     TilePaint(XY),
     /// Mouse moved over (X, Y) in tile paint mode
     TileHover(XY),
-    /// Tile at (X, Y) is erased
-    TileErase(XY),
     /// Agent is placed at (X, Y)
     AgentPlace(Vec2),
     /// Mouse moved over (X, Y) in agent place mode

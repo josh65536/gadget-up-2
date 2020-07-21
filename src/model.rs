@@ -1,4 +1,4 @@
-use golem::Dimension::{D2, D3, D4};
+use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};

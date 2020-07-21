@@ -2,9 +2,9 @@ use conrod_core::widget::{self, Widget};
 use conrod_core::{builder_method, widget_ids};
 use conrod_core::{Color, Colorable, Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::hash::Hash;
+
+
+
 
 use super::button::Button;
 use super::triangles3d::Triangles3d;
@@ -140,7 +140,7 @@ impl<'a> Widget for SelectionGrid<'a> {
                 }
 
                 if Some(i) == self.selected {
-                    let rect = widget::Rectangle::outline_styled(
+                    let _rect = widget::Rectangle::outline_styled(
                         [element.w, element.h],
                         widget::line::Style::solid()
                             .thickness(4.0)

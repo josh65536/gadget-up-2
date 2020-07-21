@@ -23,16 +23,20 @@ mod widget;
 use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
 use golem::depth::{DepthTestFunction, DepthTestMode};
-use golem::Dimension::{D2, D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{Context, ElementBuffer, GolemError, VertexBuffer};
-use golem::{GeometryMode, ShaderDescription, ShaderProgram};
-use std::cell::RefCell;
+use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
+use golem::blend::{BlendInput, BlendMode, BlendOperation};
+
+
+use golem::{Context};
+
+
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::console;
-use winit::dpi::LogicalPosition;
+
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
+use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::MouseScrollDelta;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -91,7 +95,7 @@ impl App {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
 
-    pub fn new(gl: &Rc<Context>, ui: &mut Ui, width: u32, height: u32) -> Self {
+    pub fn new(gl: &Rc<Context>, ui: &mut Ui, _width: u32, _height: u32) -> Self {
         let camera = Camera::new_orthographic(
             vec3(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, -1.0),
@@ -101,7 +105,7 @@ impl App {
             1.0,
         );
 
-        let mut grid = Grid::new();
+        let grid = Grid::new();
 
         //let def = GadgetDef::from_traversals(2, 2, vec![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
 
@@ -168,6 +172,8 @@ impl App {
     }
 
     pub fn render(&mut self, ui: &mut Ui, width: f64, height: f64) {
+        self.gl.clear();
+
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
         if let Some(gadget) = &self.gadget_tile {
@@ -198,7 +204,7 @@ impl App {
                     },
                 ..
             } => {
-                self.height = (self.height + *delta)
+                self.height = (self.height + *delta / 64.0)
                     .max(Self::HEIGHT_MIN)
                     .min(Self::HEIGHT_MAX)
             }
@@ -285,23 +291,13 @@ pub fn main_js() -> Result<(), JsValue> {
 
     let event_loop = EventLoop::new();
 
+    let original_width = crate::window().inner_width().unwrap().as_f64().unwrap();
+    let original_height = crate::window().inner_height().unwrap().as_f64().unwrap();
+
     let window = WindowBuilder::new()
+        .with_inner_size(LogicalSize::new(original_width, original_height))
         .with_title("Gadget Up! 2")
         .build(&event_loop)
-        .unwrap();
-    let gl = web_sys::window()
-        .unwrap()
-        .document()
-        .unwrap()
-        .get_element_by_id("canvas")
-        .unwrap()
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .map_err(|_| ())
-        .unwrap()
-        .get_context("webgl")
-        .expect("init webgl fail 1")
-        .expect("init webgl fail 2")
-        .dyn_into::<web_sys::WebGlRenderingContext>()
         .unwrap();
 
     // This is a hack to get 'rustc' to stop complaining
@@ -311,27 +307,52 @@ pub fn main_js() -> Result<(), JsValue> {
     // The `transmute_copy` will not be executed,
     // though there is a `fake_panic` that doesn't
     // return and doesn't say it doesn't return, just in case
-    #[cfg(target_arch = "wasm32")]
-    let gl = glow::Context::from_webgl1_context(gl);
-    #[cfg(not(target_arch = "wasm32"))]
-    fake_panic();
-    #[cfg(not(target_arch = "wasm32"))]
-    let gl = unsafe { std::mem::transmute_copy(&()) };
+    let gl = {
+        #[cfg(target_arch = "wasm32")]
+        let gl = {
+            let canvas = window.canvas();
+            // winit 0.22 sets the width and height via style,
+            // which overrides the style "canvas".
+            // No thank you.
+            let style = canvas.style();
+            style.remove_property("width").unwrap();
+            style.remove_property("height").unwrap();
 
-    let gl = Context::from_glow(gl).unwrap();
+            web_sys::window().unwrap().document().unwrap().body().unwrap().append_child(&canvas).unwrap();
+
+            let gl = canvas
+                .get_context("webgl")
+                .expect("init webgl fail 1")
+                .expect("init webgl fail 2")
+                .dyn_into::<web_sys::WebGlRenderingContext>()
+                .unwrap();
+
+            glow::Context::from_webgl1_context(gl)
+        };
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let gl = {
+            fake_panic();
+            unsafe { std::mem::transmute_copy(&()) }
+        };
+
+        Context::from_glow(gl).unwrap()
+    };
+
+    gl.set_clear_color(0.0, 0.0, 0.0, 1.0);
+    gl.set_clear_depth(-1.0);
 
     gl.set_depth_test_mode(Some(DepthTestMode {
         depth_mask: true,
         function: DepthTestFunction::GreaterOrEqual,
-        range_near: -1.0,
-        range_far: 0.0,
+        ..DepthTestMode::default()
     }));
 
-    let mut frame = 0;
-    let original_width = crate::window().inner_width().unwrap().as_f64().unwrap() as usize;
-    let original_height = crate::window().inner_height().unwrap().as_f64().unwrap() as usize;
+    gl.set_blend_mode(Some(BlendMode::default()));
 
-    let mut ui = UiBuilder::new([original_width as f64, original_height as f64]).build();
+    let mut frame = 0;
+
+    let mut ui = UiBuilder::new([original_width, original_height]).build();
     let mut app = App::new(
         &Rc::new(gl),
         &mut ui,

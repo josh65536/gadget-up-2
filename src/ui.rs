@@ -1,14 +1,14 @@
 use cgmath::vec2;
-use conrod_core::position::{Align, Direction, Place, Relative};
+use conrod_core::position::{Align, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
 use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix};
 use conrod_core::widget_ids;
 use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
-use conrod_core::{Ui, UiBuilder};
+use conrod_core::{Ui};
 
 use crate::gadget::Agent;
-use crate::log;
-use crate::shape::Shape;
+
+
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
 
@@ -92,7 +92,6 @@ impl App {
                 screen::Event::Pan(xy) => {
                     self.center += xy;
                 }
-                _ => {}
             }
         }
 

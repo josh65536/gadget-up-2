@@ -7,7 +7,6 @@ use std::rc::Rc;
 
 use crate::camera::Camera;
 use crate::grid::{Grid, WH, XY};
-use crate::log;
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::model::Model;
 use crate::shape::{Circle, Path, Rectangle, Shape};
@@ -237,8 +236,8 @@ impl Gadget {
         let mut vec = Vec::new();
         vec.resize(self.def.num_ports, vec2(0.0, 0.0));
 
-        let x: f32 = 0.0;
-        let y: f32 = 0.0;
+        let _x: f32 = 0.0;
+        let _y: f32 = 0.0;
 
         for (port, position) in self.port_map.iter().zip(self.potential_port_positions()) {
             if let Some(port) = port {
@@ -541,7 +540,7 @@ impl Agent {
             return;
         }
 
-        if let Some((gadget, xy, (w, h), idx)) =
+        if let Some((gadget, xy, (_w, _h), idx)) =
             grid.get_item_touching_edge_mut(self.double_xy, self.direction)
         {
             if let Some(port) = gadget.port(idx) {

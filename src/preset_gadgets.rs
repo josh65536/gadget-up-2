@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::gadget::{Gadget, GadgetDef};
 
 pub fn preset_gadgets() -> Vec<Gadget> {
-    let mut def = Rc::new(GadgetDef::new(1, 0));
+    let def = Rc::new(GadgetDef::new(1, 0));
 
     let nope = Gadget::new(&def, (1, 1), vec![], 0);
 
@@ -124,7 +124,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let lockToggle2 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let lock_toggle_2 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -132,7 +132,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         vec![((0, 0), (1, 1)), ((1, 2), (0, 3))],
     ));
 
-    let mismatchedDicrumbler =
+    let mismatched_dicrumbler =
         Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
@@ -146,7 +146,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let mismatchedCrumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let mismatched_crumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -154,7 +154,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         vec![((0, 0), (1, 1)), ((0, 2), (1, 3))],
     ));
 
-    let matchedDicrumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let matched_dicrumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -167,7 +167,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let matchedCrumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let matched_crumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -180,7 +180,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let toggleLock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let toggle_lock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -195,7 +195,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwireLock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let tripwire_lock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -210,7 +210,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwireToggle = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let tripwire_toggle = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     vec![
         nope,
@@ -226,13 +226,13 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         crumbler,
         scd,
         toggle2,
-        lockToggle2,
-        mismatchedDicrumbler,
-        mismatchedCrumbler,
-        matchedDicrumbler,
-        matchedCrumbler,
-        toggleLock,
-        tripwireLock,
-        tripwireToggle,
+        lock_toggle_2,
+        mismatched_dicrumbler,
+        mismatched_crumbler,
+        matched_dicrumbler,
+        matched_crumbler,
+        toggle_lock,
+        tripwire_lock,
+        tripwire_toggle,
     ]
 }

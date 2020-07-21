@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
-use crate::log;
+
 use crate::math::Vec2i;
 
 pub type XY = Vec2i;
@@ -48,7 +48,7 @@ impl<T> Grid<T> {
         min_y: f64,
         max_y: f64,
     ) -> impl Iterator<Item = &(T, XY, WH)> {
-        self.items.values().filter(move |(t, xy, wh)| {
+        self.items.values().filter(move |(_t, xy, wh)| {
             let [x, y] = [xy.x as f64, xy.y as f64];
             let [w, h] = [wh.0 as f64, wh.1 as f64];
 
@@ -151,7 +151,7 @@ impl<T> Grid<T> {
     /// Removes the item at a specific position
     pub fn remove(&mut self, position: XY) {
         if let Some(idx) = self.grid.get(&position) {
-            let (t, xy, (w, h)) = self.items.remove(idx).unwrap();
+            let (_t, xy, (w, h)) = self.items.remove(idx).unwrap();
 
             for y in xy.y..(xy.y + h as i32) {
                 for x in xy.x..(xy.x + w as i32) {
