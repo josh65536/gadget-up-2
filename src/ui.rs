@@ -1,15 +1,15 @@
-use conrod_core::position::{Align, Place, Relative, Direction};
+use cgmath::vec2;
+use conrod_core::position::{Align, Direction, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
-use conrod_core::widget::{self, bordered_rectangle, BorderedRectangle, matrix, Matrix};
+use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix};
 use conrod_core::widget_ids;
 use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
 use conrod_core::{Ui, UiBuilder};
-use cgmath::vec2;
 
-use crate::shape::Shape;
-use crate::log;
 use crate::gadget::Agent;
-use crate::widget::{screen, ContraptionScreen, SelectionGrid, Triangles3d, Button};
+use crate::log;
+use crate::shape::Shape;
+use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
 
 widget_ids! {
@@ -58,7 +58,10 @@ impl App {
                 screen::Event::TilePaint(xy) => {
                     if let Some(gadget) = &self.gadget_tile {
                         // Nope gadget is special
-                        if gadget.def().num_states() == 1 && gadget.def().num_ports() == 0 && gadget.size() == (1, 1) {
+                        if gadget.def().num_states() == 1
+                            && gadget.def().num_ports() == 0
+                            && gadget.size() == (1, 1)
+                        {
                             self.grid.remove(xy);
                         } else {
                             self.grid.insert(gadget.clone(), xy, gadget.size());
@@ -106,7 +109,6 @@ impl App {
             .y_position_relative_to(ui.window, Relative::Align(Align::End))
             .set(self.ids.menu, &mut ui);
 
-
         //while let Some(element) = Matrix::new(2, 1)
         //    .x(3.0)
         //    .y(0.0)
@@ -126,23 +128,38 @@ impl App {
             }
 
             let positions: Vec<f32> = vec![
-                0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15, 0.0,
+                0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15,
+                0.0,
             ];
             let colors: Vec<f32> = vec![
-                0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0,
-                0.8, 0.0, 1.0,
+                0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0,
+                0.0, 0.8, 0.0, 1.0,
             ];
             let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
 
-            for _ in Button::triangles(Triangles3d::new(positions, colors, indexes, vec2(0.0, 0.0), 0.3, 0.3))
-                .x_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(App::MENU_HEIGHT))))
-                .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
-                .w(App::MENU_HEIGHT - 6.0)
-                .h(34.0)
-                .set(self.ids.agent, &mut ui)
+            for _ in Button::triangles(Triangles3d::new(
+                positions,
+                colors,
+                indexes,
+                vec2(0.0, 0.0),
+                0.3,
+                0.3,
+            ))
+            .x_position_relative_to(
+                self.ids.menu,
+                Relative::Place(Place::Start(Some(App::MENU_HEIGHT))),
+            )
+            .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
+            .w(App::MENU_HEIGHT - 6.0)
+            .h(34.0)
+            .set(self.ids.agent, &mut ui)
             {
                 self.set_mode(Mode::AgentPlace);
-                self.agent = Some(Agent::new(self.agent_position, vec2(0, 1), &self.agent_model));
+                self.agent = Some(Agent::new(
+                    self.agent_position,
+                    vec2(0, 1),
+                    &self.agent_model,
+                ));
             }
         }
         //}

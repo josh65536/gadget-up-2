@@ -1,12 +1,12 @@
-use std::rc::Rc;
-use golem::{Context, ShaderDescription, ShaderProgram};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{VertexBuffer, ElementBuffer, GeometryMode};
 use golem::Dimension::{D2, D3, D4};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{Context, ShaderDescription, ShaderProgram};
+use golem::{ElementBuffer, GeometryMode, VertexBuffer};
+use std::rc::Rc;
 
-use crate::log;
 use crate::camera::Camera;
-use crate::math::{Vec3, Mat4, ToArray};
+use crate::log;
+use crate::math::{Mat4, ToArray, Vec3};
 
 /// A simple model.
 pub struct Model {
@@ -25,18 +25,15 @@ impl Model {
         colors: &Vec<f32>,
         indexes: &Vec<u32>,
     ) -> Self {
-        let program = ShaderProgram::new(gl,
+        let program = ShaderProgram::new(
+            gl,
             ShaderDescription {
                 vertex_input: &[
                     Attribute::new("v_position", AttributeType::Vector(D3)),
                     Attribute::new("v_color", AttributeType::Vector(D4)),
                 ],
-                fragment_input: &[
-                    Attribute::new("f_color", AttributeType::Vector(D4)),
-                ],
-                uniforms: &[
-                    Uniform::new("transform", UniformType::Matrix(D4)),
-                ],
+                fragment_input: &[Attribute::new("f_color", AttributeType::Vector(D4))],
+                uniforms: &[Uniform::new("transform", UniformType::Matrix(D4))],
                 vertex_shader: r#"void main() {
                     f_color = v_color;
                     gl_Position = transform * vec4(v_position, 1.0);
@@ -44,16 +41,20 @@ impl Model {
                 fragment_shader: r#"void main() {
                     gl_FragColor = f_color;
                 }"#,
-            }
-        ).unwrap();
+            },
+        )
+        .unwrap();
 
-
-        let vertices = positions.chunks(3).zip(colors.chunks(4))
-            .flat_map(|(p, c)| p.iter().chain(c.iter())).copied().collect::<Vec<_>>();
+        let vertices = positions
+            .chunks(3)
+            .zip(colors.chunks(4))
+            .flat_map(|(p, c)| p.iter().chain(c.iter()))
+            .copied()
+            .collect::<Vec<_>>();
 
         let mut vertex_buffer = VertexBuffer::new(gl).unwrap();
         vertex_buffer.set_data(&vertices);
-        
+
         let mut index_buffer = ElementBuffer::new(gl).unwrap();
         index_buffer.set_data(&indexes);
 
@@ -68,12 +69,24 @@ impl Model {
 
     pub fn render(&self, transform: Mat4, camera: &Camera) {
         let transform: Mat4 = camera.get_projection() * camera.get_view() * transform;
-        
+
         self.program.bind();
-        self.program.set_uniform("transform", UniformValue::Matrix4(transform.cast::<f32>().unwrap().to_array())).unwrap();
+        self.program
+            .set_uniform(
+                "transform",
+                UniformValue::Matrix4(transform.cast::<f32>().unwrap().to_array()),
+            )
+            .unwrap();
 
         unsafe {
-            self.program.draw(&self.vertices, &self.indexes, 0..self.num_indexes, GeometryMode::Triangles).unwrap();
+            self.program
+                .draw(
+                    &self.vertices,
+                    &self.indexes,
+                    0..self.num_indexes,
+                    GeometryMode::Triangles,
+                )
+                .unwrap();
         }
     }
 

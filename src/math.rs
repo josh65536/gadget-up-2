@@ -1,6 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::BaseNum;
-use cgmath::{Vector2, Vector3, Vector4, Point3, Matrix4, Deg, Rad};
+use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 use std::ops::Neg;
 
 pub const TAUf32: f32 = std::f32::consts::PI * 2.0;

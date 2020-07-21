@@ -3,12 +3,12 @@ extern crate conrod_core;
 extern crate conrod_derive;
 extern crate conrod_winit;
 extern crate fnv;
+extern crate glow;
 extern crate itertools;
 extern crate winit;
-extern crate glow;
 
-mod camera;
 mod bitfield;
+mod camera;
 mod gadget;
 mod graphics_ex;
 mod grid;
@@ -22,30 +22,30 @@ mod widget;
 
 use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
+use golem::depth::{DepthTestFunction, DepthTestMode};
+use golem::Dimension::{D2, D3, D4};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{Context, ElementBuffer, GolemError, VertexBuffer};
+use golem::{GeometryMode, ShaderDescription, ShaderProgram};
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::console;
-use winit::event_loop::{EventLoop, ControlFlow};
-use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode};
-use winit::event::MouseScrollDelta;
 use winit::dpi::LogicalPosition;
+use winit::event::MouseScrollDelta;
+use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
-use golem::{Context, GolemError, VertexBuffer, ElementBuffer};
-use golem::{ShaderProgram, ShaderDescription, GeometryMode};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::depth::{DepthTestFunction, DepthTestMode};
-use golem::Dimension::{D2, D3, D4};
 
 use camera::Camera;
-use gadget::{Gadget, GadgetDef, Agent};
+use gadget::{Agent, Gadget, GadgetDef};
 use graphics_ex::GraphicsEx;
 use grid::Grid;
-use render::GadgetRenderer;
-use ui::{WidgetIds, Mode};
-use model::Model;
 use math::Vec2;
+use model::Model;
+use render::GadgetRenderer;
+use ui::{Mode, WidgetIds};
 
 #[macro_export]
 macro_rules! log {
@@ -125,17 +125,9 @@ impl App {
         //let size = gadget.size();
         //grid.insert(gadget, (1, 2), size);
 
-        let def = GadgetDef::new(
-            2,
-            0,
-        );
+        let def = GadgetDef::new(2, 0);
 
-        let gadget_select_rep = Gadget::new(
-            &Rc::new(def),
-            (1, 1),
-            vec![],
-            0,
-        );
+        let gadget_select_rep = Gadget::new(&Rc::new(def), (1, 1), vec![], 0);
 
         let widget_ids = WidgetIds::new(ui.widget_id_generator());
 
@@ -171,7 +163,8 @@ impl App {
 
         let cx = self.center.x;
         let cy = self.center.y;
-        self.camera.set_view(vec3(cx, cy, 0.0), vec3(cx, cy, -1.0), vec3(0.0, 1.0, 0.0));
+        self.camera
+            .set_view(vec3(cx, cy, 0.0), vec3(cx, cy, -1.0), vec3(0.0, 1.0, 0.0));
     }
 
     pub fn render(&mut self, ui: &mut Ui, width: f64, height: f64) {
@@ -197,23 +190,41 @@ impl App {
 
     pub fn handle_input(&mut self, event: &Event<()>) {
         match event {
-            Event::WindowEvent { event: WindowEvent::MouseWheel {delta: MouseScrollDelta::PixelDelta(
-                LogicalPosition {y: delta, ..}
-            ), ..}, ..} => {
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseWheel {
+                        delta: MouseScrollDelta::PixelDelta(LogicalPosition { y: delta, .. }),
+                        ..
+                    },
+                ..
+            } => {
                 self.height = (self.height + *delta)
                     .max(Self::HEIGHT_MIN)
                     .min(Self::HEIGHT_MAX)
             }
 
-            Event::WindowEvent { event: WindowEvent::KeyboardInput {input: KeyboardInput {
-                virtual_keycode: Some(keycode), state, ..
-            }, ..}, ..} => {
-
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(keycode),
+                                state,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
                 match keycode {
                     VirtualKeyCode::R | VirtualKeyCode::T => {
                         if let ElementState::Pressed = state {
                             if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.rotate_ports(if *keycode == VirtualKeyCode::R {1} else {-1});
+                                gadget.rotate_ports(if *keycode == VirtualKeyCode::R {
+                                    1
+                                } else {
+                                    -1
+                                });
                             }
 
                             if self.mode == Mode::AgentPlace {
@@ -222,7 +233,7 @@ impl App {
                                 }
                             }
                         }
-                    },
+                    }
 
                     VirtualKeyCode::F => {
                         if let ElementState::Pressed = state {
@@ -230,7 +241,7 @@ impl App {
                                 gadget.flip_ports();
                             }
                         }
-                    },
+                    }
 
                     VirtualKeyCode::C => {
                         if let ElementState::Pressed = state {
@@ -238,7 +249,7 @@ impl App {
                                 gadget.cycle_state();
                             }
                         }
-                    },
+                    }
 
                     _ => {}
                 }
@@ -271,19 +282,32 @@ pub fn main_js() -> Result<(), JsValue> {
     // It's disabled in release mode so it doesn't bloat up the file size.
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
-    
+
     let event_loop = EventLoop::new();
 
-    let window = WindowBuilder::new().with_title("Gadget Up! 2").build(&event_loop).unwrap();
-    let gl = web_sys::window().unwrap().document().unwrap().get_element_by_id("canvas").unwrap()
-        .dyn_into::<web_sys::HtmlCanvasElement>().map_err(|_| ()).unwrap()
-        .get_context("webgl").expect("init webgl fail 1").expect("init webgl fail 2")
-        .dyn_into::<web_sys::WebGlRenderingContext>().unwrap();
+    let window = WindowBuilder::new()
+        .with_title("Gadget Up! 2")
+        .build(&event_loop)
+        .unwrap();
+    let gl = web_sys::window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .get_element_by_id("canvas")
+        .unwrap()
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .map_err(|_| ())
+        .unwrap()
+        .get_context("webgl")
+        .expect("init webgl fail 1")
+        .expect("init webgl fail 2")
+        .dyn_into::<web_sys::WebGlRenderingContext>()
+        .unwrap();
 
     // This is a hack to get 'rustc' to stop complaining
     // about this function 'not existing' and move on to
     // more interesting errors.
-    // 
+    //
     // The `transmute_copy` will not be executed,
     // though there is a `fake_panic` that doesn't
     // return and doesn't say it doesn't return, just in case
@@ -308,7 +332,12 @@ pub fn main_js() -> Result<(), JsValue> {
     let original_height = crate::window().inner_height().unwrap().as_f64().unwrap() as usize;
 
     let mut ui = UiBuilder::new([original_width as f64, original_height as f64]).build();
-    let mut app = App::new(&Rc::new(gl), &mut ui, original_width as u32, original_height as u32);
+    let mut app = App::new(
+        &Rc::new(gl),
+        &mut ui,
+        original_width as u32,
+        original_height as u32,
+    );
 
     event_loop.run(move |event, _, ctrl| {
         let width = crate::window().inner_width().unwrap().as_f64().unwrap();
@@ -331,7 +360,7 @@ pub fn main_js() -> Result<(), JsValue> {
 
                 frame += 1;
                 window.request_redraw();
-            },
+            }
 
             event => {
                 app.handle_input(&event);

@@ -3,7 +3,7 @@ use itertools::izip;
 
 use crate::log;
 use crate::math::TAUf64;
-use crate::math::{Vector2Ex, Vec2};
+use crate::math::{Vec2, Vector2Ex};
 
 pub trait Shape {
     fn num_vertices(&self) -> usize;
@@ -87,8 +87,10 @@ impl Shape for Circle {
         (0..Self::RESOLUTION)
             .flat_map(|i| {
                 vec![
-                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x) as f32,
-                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y) as f32,
+                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x)
+                        as f32,
+                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y)
+                        as f32,
                     self.z as f32,
                 ]
             })

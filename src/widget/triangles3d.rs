@@ -1,12 +1,12 @@
+use cgmath::vec2;
 use conrod_core::widget;
 use conrod_core::Widget;
 use conrod_derive::WidgetCommon;
-use cgmath::vec2;
 
-use crate::math::Vec2;
 use crate::gadget::Gadget;
 use crate::graphics_ex::GraphicsEx;
 use crate::log;
+use crate::math::Vec2;
 use crate::shape::Shape;
 
 /// Triangles, but in 3D
@@ -24,8 +24,14 @@ pub struct Triangles3d {
 }
 
 impl Triangles3d {
-
-    pub fn new(positions: Vec<f32>, colors: Vec<f32>, indexes: Vec<u32>, src_center: Vec2, src_width: f64, src_height: f64) -> Self {
+    pub fn new(
+        positions: Vec<f32>,
+        colors: Vec<f32>,
+        indexes: Vec<u32>,
+        src_center: Vec2,
+        src_width: f64,
+        src_height: f64,
+    ) -> Self {
         Self {
             common: widget::CommonBuilder::default(),
             positions,
@@ -75,10 +81,14 @@ impl State {
 
         g.positions.extend(self.positions.iter());
         g.offsets.extend(
-            [self.offset.x as f32, self.offset.y as f32, GraphicsEx::UI_Z_BASE as f32]
-                .iter()
-                .cycle()
-                .take(self.positions.len()),
+            [
+                self.offset.x as f32,
+                self.offset.y as f32,
+                GraphicsEx::UI_Z_BASE as f32,
+            ]
+            .iter()
+            .cycle()
+            .take(self.positions.len()),
         );
         g.colors.extend(self.colors.iter());
         g.indexes.extend(self.indexes.iter().map(|i| *i + old_len));

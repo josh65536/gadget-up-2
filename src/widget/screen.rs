@@ -1,5 +1,5 @@
-use cgmath::{vec2, vec4, Vector2};
 use cgmath::prelude::*;
+use cgmath::{vec2, vec4, Vector2};
 use conrod_core::image;
 use conrod_core::input::widget::Mouse;
 use conrod_core::widget::{self, Widget};
@@ -9,10 +9,10 @@ use conrod_core::{Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use crate::camera::Camera;
-use crate::math::Vec2;
 use crate::grid::XY;
-use crate::{bitfield, log};
+use crate::math::Vec2;
 use crate::ui::Mode;
+use crate::{bitfield, log};
 
 widget_ids! {
     pub struct Ids {
@@ -91,8 +91,7 @@ impl<'a> ContraptionScreen<'a> {
             let [mut x, mut y] = mouse.rel_xy();
             x /= w * 0.5;
             y /= h * 0.5;
-            let position = camera.position()
-                + camera.view_offset_at_screen(vec4(x, y, 0.0, 1.0));
+            let position = camera.position() + camera.view_offset_at_screen(vec4(x, y, 0.0, 1.0));
             state.position = [position.x, position.y];
         } else {
             state.input_raw.set_left(false);
@@ -267,7 +266,10 @@ impl<'a> Widget for ContraptionScreen<'a> {
         let mut vec = vec![];
 
         if args.state.input.is_middle() && args.state.position != args.state.prev_position {
-            vec.push(Event::Pan(vec2(args.state.prev_position[0], args.state.prev_position[1]) - vec2(args.state.position[0], args.state.position[1])));
+            vec.push(Event::Pan(
+                vec2(args.state.prev_position[0], args.state.prev_position[1])
+                    - vec2(args.state.position[0], args.state.position[1]),
+            ));
             args.state.update(|state| {
                 state.position = state.prev_position;
             })
@@ -276,7 +278,7 @@ impl<'a> Widget for ContraptionScreen<'a> {
         vec.append(&mut match self.mode {
             Mode::TilePaint => self.update_paint_tile(args),
             Mode::AgentPlace => self.update_place_agent(args),
-            _ => vec![]
+            _ => vec![],
         });
 
         vec

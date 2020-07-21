@@ -1,16 +1,16 @@
 use cgmath::vec3;
 use conrod_core::render::{Primitive, PrimitiveKind, PrimitiveWalker};
 use conrod_core::Widget;
-use std::rc::Rc;
-use golem::{Context, ShaderDescription, ShaderProgram};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{VertexBuffer, ElementBuffer, GeometryMode};
 use golem::Dimension::{D2, D3, D4};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{Context, ShaderDescription, ShaderProgram};
+use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use itertools::izip;
+use std::rc::Rc;
 
+use crate::camera::Camera;
 use crate::log;
 use crate::math::ToArray;
-use crate::camera::Camera;
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;
 
@@ -44,19 +44,16 @@ impl GraphicsEx {
             1.0,
         );
 
-        let program = ShaderProgram::new(gl,
+        let program = ShaderProgram::new(
+            gl,
             ShaderDescription {
                 vertex_input: &[
                     Attribute::new("v_position", AttributeType::Vector(D3)),
                     Attribute::new("v_offset", AttributeType::Vector(D3)),
                     Attribute::new("v_color", AttributeType::Vector(D4)),
                 ],
-                fragment_input: &[
-                    Attribute::new("f_color", AttributeType::Vector(D4)),
-                ],
-                uniforms: &[
-                    Uniform::new("transform", UniformType::Matrix(D4)),
-                ],
+                fragment_input: &[Attribute::new("f_color", AttributeType::Vector(D4))],
+                uniforms: &[Uniform::new("transform", UniformType::Matrix(D4))],
                 vertex_shader: r#"void main() {
                     f_color = v_color;
                     gl_Position = transform * vec4(v_position + v_offset, 1.0);
@@ -64,8 +61,9 @@ impl GraphicsEx {
                 fragment_shader: r#"void main() {
                     gl_FragColor = f_color;
                 }"#,
-            }
-        ).unwrap();
+            },
+        )
+        .unwrap();
 
         Self {
             gl: Rc::clone(gl),
@@ -94,16 +92,32 @@ impl GraphicsEx {
         let world_view_projection = self.camera.get_projection() * self.camera.get_view();
 
         self.program.bind();
-        self.program.set_uniform("transform", UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array())).unwrap();
+        self.program
+            .set_uniform(
+                "transform",
+                UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array()),
+            )
+            .unwrap();
 
-        let vertices = izip!(self.positions.chunks(3), self.offsets.chunks(3), self.colors.chunks(4))
-            .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter())).copied().collect::<Vec<_>>();
+        let vertices = izip!(
+            self.positions.chunks(3),
+            self.offsets.chunks(3),
+            self.colors.chunks(4)
+        )
+        .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter()))
+        .copied()
+        .collect::<Vec<_>>();
 
         self.vertex_buffer.set_data(&vertices);
         self.index_buffer.set_data(&self.indexes);
 
         unsafe {
-            self.program.draw(&self.vertex_buffer, &self.index_buffer, 0..self.indexes.len(), GeometryMode::Triangles);
+            self.program.draw(
+                &self.vertex_buffer,
+                &self.index_buffer,
+                0..self.indexes.len(),
+                GeometryMode::Triangles,
+            );
         }
     }
 
@@ -118,8 +132,12 @@ impl GraphicsEx {
 
                 rect.append_to(&mut self.positions, &mut self.indexes);
 
-                self.offsets
-                    .extend([x as f32, y as f32, GraphicsEx::UI_Z_BASE as f32].iter().cycle().take(4 * 3));
+                self.offsets.extend(
+                    [x as f32, y as f32, GraphicsEx::UI_Z_BASE as f32]
+                        .iter()
+                        .cycle()
+                        .take(4 * 3),
+                );
                 let rgba = color.to_rgb();
                 self.colors
                     .extend([rgba.0, rgba.1, rgba.2, rgba.3].iter().cycle().take(4 * 4));

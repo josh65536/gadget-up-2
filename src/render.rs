@@ -1,16 +1,16 @@
+use crate::camera::Camera;
 use crate::gadget::{Gadget, GadgetRenderInfo};
 use crate::grid::{Grid, WH, XY};
-use crate::math::ToArray;
 use crate::log;
+use crate::math::ToArray;
 use crate::shape::{Rectangle, Shape};
-use crate::camera::Camera;
 
-use std::rc::Rc;
-use itertools::izip;
-use golem::{Context, ShaderDescription, ShaderProgram};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{VertexBuffer, ElementBuffer, GeometryMode};
 use golem::Dimension::{D2, D3, D4};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{Context, ShaderDescription, ShaderProgram};
+use golem::{ElementBuffer, GeometryMode, VertexBuffer};
+use itertools::izip;
+use std::rc::Rc;
 
 /// Takes a grid and renders it. Assumes the grid is on the XY plane,
 /// with X in the grid pointing in the X direction
@@ -70,19 +70,16 @@ pub struct GadgetRenderer {
 
 impl GadgetRenderer {
     pub fn new(gl: &Rc<Context>) -> Self {
-        let program = ShaderProgram::new(gl,
+        let program = ShaderProgram::new(
+            gl,
             ShaderDescription {
                 vertex_input: &[
                     Attribute::new("v_position", AttributeType::Vector(D3)),
                     Attribute::new("v_offset", AttributeType::Vector(D3)),
                     Attribute::new("v_color", AttributeType::Vector(D4)),
                 ],
-                fragment_input: &[
-                    Attribute::new("f_color", AttributeType::Vector(D4)),
-                ],
-                uniforms: &[
-                    Uniform::new("transform", UniformType::Matrix(D4)),
-                ],
+                fragment_input: &[Attribute::new("f_color", AttributeType::Vector(D4))],
+                uniforms: &[Uniform::new("transform", UniformType::Matrix(D4))],
                 vertex_shader: r#"void main() {
                     f_color = v_color;
                     gl_Position = transform * vec4(v_position + v_offset, 1.0);
@@ -90,8 +87,9 @@ impl GadgetRenderer {
                 fragment_shader: r#"void main() {
                     gl_FragColor = f_color;
                 }"#,
-            }
-        ).unwrap();
+            },
+        )
+        .unwrap();
 
         Self {
             program,
@@ -153,16 +151,32 @@ impl GridItemRenderer for GadgetRenderer {
         let world_view_projection = camera.get_projection() * camera.get_view();
 
         self.program.bind();
-        self.program.set_uniform("transform", UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array())).unwrap();
+        self.program
+            .set_uniform(
+                "transform",
+                UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array()),
+            )
+            .unwrap();
 
-        let vertices = izip!(self.positions.chunks(3), self.offsets.chunks(3), self.colors.chunks(4))
-            .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter())).copied().collect::<Vec<_>>();
+        let vertices = izip!(
+            self.positions.chunks(3),
+            self.offsets.chunks(3),
+            self.colors.chunks(4)
+        )
+        .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter()))
+        .copied()
+        .collect::<Vec<_>>();
 
         self.vertex_buffer.set_data(&vertices);
         self.index_buffer.set_data(&self.indexes);
 
         unsafe {
-            self.program.draw(&self.vertex_buffer, &self.index_buffer, 0..self.indexes.len(), GeometryMode::Triangles);
+            self.program.draw(
+                &self.vertex_buffer,
+                &self.index_buffer,
+                0..self.indexes.len(),
+                GeometryMode::Triangles,
+            );
         }
     }
 }

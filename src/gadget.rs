@@ -1,16 +1,16 @@
 use cgmath::prelude::*;
 use cgmath::{vec2, vec4};
 use fnv::{FnvHashMap, FnvHashSet};
+use golem::Context;
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
-use golem::Context;
 
+use crate::camera::Camera;
 use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::math::{Vec2i, Vector2Ex, Vec2, Mat4};
+use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::model::Model;
 use crate::shape::{Circle, Path, Rectangle, Shape};
-use crate::camera::Camera;
 
 pub type Port = u32;
 pub type State = u32;
@@ -447,7 +447,8 @@ impl GadgetRenderInfo {
                     end.x as f32, end.y as f32, GadgetRenderInfo::PATH_Z as f32,
                     v2.x as f32, v2.y as f32, GadgetRenderInfo::PATH_Z as f32,
                 ]);
-                self.colors.extend([0.0, 0.0, 0.0, 1.0].iter().cycle().take(4 * 3));
+                self.colors
+                    .extend([0.0, 0.0, 0.0, 1.0].iter().cycle().take(4 * 3));
                 self.indexes.extend(&[old_len, old_len + 1, old_len + 2]);
             }
         }
