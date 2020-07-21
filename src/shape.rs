@@ -1,10 +1,9 @@
 use cgmath::prelude::*;
 use itertools::izip;
-use three_d::Vec2;
 
 use crate::log;
-use crate::math::TAUf32;
-use crate::math::Vector2Ex;
+use crate::math::TAUf64;
+use crate::math::{Vector2Ex, Vec2};
 
 pub trait Shape {
     fn num_vertices(&self) -> usize;
@@ -23,15 +22,15 @@ pub trait Shape {
 
 #[derive(Clone, Debug)]
 pub struct Rectangle {
-    min_x: f32,
-    max_x: f32,
-    min_y: f32,
-    max_y: f32,
-    z: f32,
+    min_x: f64,
+    max_x: f64,
+    min_y: f64,
+    max_y: f64,
+    z: f64,
 }
 
 impl Rectangle {
-    pub fn new(min_x: f32, max_x: f32, min_y: f32, max_y: f32, z: f32) -> Self {
+    pub fn new(min_x: f64, max_x: f64, min_y: f64, max_y: f64, z: f64) -> Self {
         Self {
             min_x,
             max_x,
@@ -47,10 +46,13 @@ impl Shape for Rectangle {
         4
     }
 
+    #[rustfmt::skip]
     fn positions(&self) -> Vec<f32> {
         vec![
-            self.min_x, self.min_y, self.z, self.max_x, self.min_y, self.z, self.max_x, self.max_y,
-            self.z, self.min_x, self.max_y, self.z,
+            self.min_x as f32, self.min_y as f32, self.z as f32,
+            self.max_x as f32, self.min_y as f32, self.z as f32,
+            self.max_x as f32, self.max_y as f32, self.z as f32,
+            self.min_x as f32, self.max_y as f32, self.z as f32,
         ]
     }
 
@@ -61,17 +63,17 @@ impl Shape for Rectangle {
 
 #[derive(Clone, Debug)]
 pub struct Circle {
-    x: f32,
-    y: f32,
-    z: f32,
-    radius: f32,
+    x: f64,
+    y: f64,
+    z: f64,
+    radius: f64,
 }
 
 impl Circle {
     const RESOLUTION: usize = 32;
 
     /// Circle is placed parallel to the xy plane
-    pub fn new(x: f32, y: f32, z: f32, radius: f32) -> Self {
+    pub fn new(x: f64, y: f64, z: f64, radius: f64) -> Self {
         Self { x, y, z, radius }
     }
 }
@@ -85,12 +87,12 @@ impl Shape for Circle {
         (0..Self::RESOLUTION)
             .flat_map(|i| {
                 vec![
-                    (TAUf32 * i as f32 / Self::RESOLUTION as f32).cos() * self.radius + self.x,
-                    (TAUf32 * i as f32 / Self::RESOLUTION as f32).sin() * self.radius + self.y,
-                    self.z,
+                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x) as f32,
+                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y) as f32,
+                    self.z as f32,
                 ]
             })
-            .chain(vec![self.x, self.y, self.z])
+            .chain(vec![self.x as f32, self.y as f32, self.z as f32])
             .collect()
     }
 
@@ -111,13 +113,13 @@ impl Shape for Circle {
 /// A series of line segments
 pub struct Path {
     xys: Vec<Vec2>,
-    z: f32,
-    thickness: f32,
+    z: f64,
+    thickness: f64,
     closed: bool,
 }
 
 impl Path {
-    pub fn new(xys: Vec<Vec2>, z: f32, thickness: f32, closed: bool) -> Self {
+    pub fn new(xys: Vec<Vec2>, z: f64, thickness: f64, closed: bool) -> Self {
         Self {
             xys,
             z,
@@ -128,12 +130,12 @@ impl Path {
 
     /// Splits a cubic bezier curve into line segments
     /// The xys are [vertex 0, end control 0, start control 1, vertex 1]
-    pub fn from_bezier3(xys: [Vec2; 4], z: f32, thickness: f32) -> Self {
+    pub fn from_bezier3(xys: [Vec2; 4], z: f64, thickness: f64) -> Self {
         const RESOLUTION: usize = 32;
 
         let xys = (0..=RESOLUTION)
             .map(|i| {
-                let t = i as f32 / RESOLUTION as f32;
+                let t = i as f64 / RESOLUTION as f64;
 
                 let tr = 1.0 - t;
                 let t2 = t * t;
@@ -188,12 +190,12 @@ impl Shape for Path {
                 let dv1 = dv1.right_ccw().normalize_to(self.thickness / 2.0);
 
                 vec.extend(&[
-                    v1.x + dv1.x,
-                    v1.y + dv1.y,
-                    self.z,
-                    v1.x - dv1.x,
-                    v1.y - dv1.y,
-                    self.z,
+                    (v1.x + dv1.x) as f32,
+                    (v1.y + dv1.y) as f32,
+                    self.z as f32,
+                    (v1.x - dv1.x) as f32,
+                    (v1.y - dv1.y) as f32,
+                    self.z as f32,
                 ]);
             }
         }
@@ -204,12 +206,12 @@ impl Shape for Path {
                 let dv0 = dv0.right_ccw().normalize_to(self.thickness / 2.0);
 
                 vec.extend(&[
-                    v1.x + dv0.x,
-                    v1.y + dv0.y,
-                    self.z,
-                    v1.x - dv0.x,
-                    v1.y - dv0.y,
-                    self.z,
+                    (v1.x + dv0.x) as f32,
+                    (v1.y + dv0.y) as f32,
+                    self.z as f32,
+                    (v1.x - dv0.x) as f32,
+                    (v1.y - dv0.y) as f32,
+                    self.z as f32,
                 ]);
             } else {
                 let dv0: Vec2 = (v1 - v0).normalize();
@@ -217,12 +219,12 @@ impl Shape for Path {
 
                 let dv = (dv1.right_ccw() + dv0.right_ccw()).normalize_to(self.thickness / 2.0);
                 vec.extend(&[
-                    v1.x + dv.x,
-                    v1.y + dv.y,
-                    self.z,
-                    v1.x - dv.x,
-                    v1.y - dv.y,
-                    self.z,
+                    (v1.x + dv.x) as f32,
+                    (v1.y + dv.y) as f32,
+                    self.z as f32,
+                    (v1.x - dv.x) as f32,
+                    (v1.y - dv.y) as f32,
+                    self.z as f32,
                 ]);
             }
         }

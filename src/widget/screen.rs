@@ -1,4 +1,4 @@
-use cgmath::{vec2, Vector2};
+use cgmath::{vec2, vec4, Vector2};
 use cgmath::prelude::*;
 use conrod_core::image;
 use conrod_core::input::widget::Mouse;
@@ -7,8 +7,9 @@ use conrod_core::Point;
 use conrod_core::{utils, widget_ids};
 use conrod_core::{Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
-use three_d::{vec4, Camera, Vec2};
 
+use crate::camera::Camera;
+use crate::math::Vec2;
 use crate::grid::XY;
 use crate::{bitfield, log};
 use crate::ui::Mode;
@@ -91,8 +92,8 @@ impl<'a> ContraptionScreen<'a> {
             x /= w * 0.5;
             y /= h * 0.5;
             let position = camera.position()
-                + camera.view_offset_at_screen(vec4(x as f32, y as f32, 0.0, 1.0));
-            state.position = [position.x as f64, position.y as f64];
+                + camera.view_offset_at_screen(vec4(x, y, 0.0, 1.0));
+            state.position = [position.x, position.y];
         } else {
             state.input_raw.set_left(false);
             state.input_raw.set_middle(false);
@@ -192,8 +193,8 @@ impl<'a> ContraptionScreen<'a> {
                     xx = xx.round();
                     yy = yy.round();
 
-                    let x = ((xx + yy) * 0.5 + 0.5) as f32;
-                    let y = ((-xx + yy) * 0.5) as f32;
+                    let x = (xx + yy) * 0.5 + 0.5;
+                    let y = (-xx + yy) * 0.5;
 
                     if state.pressed.is_left() {
                         events.push(Event::AgentPlace(vec2(x, y)));

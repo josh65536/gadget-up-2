@@ -1,8 +1,9 @@
 use conrod_core::widget;
 use conrod_core::Widget;
 use conrod_derive::WidgetCommon;
-use three_d::{vec2, Vec2};
+use cgmath::vec2;
 
+use crate::math::Vec2;
 use crate::gadget::Gadget;
 use crate::graphics_ex::GraphicsEx;
 use crate::log;
@@ -18,13 +19,13 @@ pub struct Triangles3d {
     indexes: Vec<u32>,
     // These get mapped onto the bounding rectangle.
     src_center: Vec2,
-    src_width: f32,
-    src_height: f32,
+    src_width: f64,
+    src_height: f64,
 }
 
 impl Triangles3d {
 
-    pub fn new(positions: Vec<f32>, colors: Vec<f32>, indexes: Vec<u32>, src_center: Vec2, src_width: f32, src_height: f32) -> Self {
+    pub fn new(positions: Vec<f32>, colors: Vec<f32>, indexes: Vec<u32>, src_center: Vec2, src_width: f64, src_height: f64) -> Self {
         Self {
             common: widget::CommonBuilder::default(),
             positions,
@@ -37,8 +38,8 @@ impl Triangles3d {
     }
 
     pub fn from_gadget(gadget: &Gadget) -> Self {
-        let width = gadget.size().0 as f32;
-        let height = gadget.size().1 as f32;
+        let width = gadget.size().0 as f64;
+        let height = gadget.size().1 as f64;
 
         Self {
             common: widget::CommonBuilder::default(),
@@ -74,7 +75,7 @@ impl State {
 
         g.positions.extend(self.positions.iter());
         g.offsets.extend(
-            [self.offset.x, self.offset.y, GraphicsEx::UI_Z_BASE]
+            [self.offset.x as f32, self.offset.y as f32, GraphicsEx::UI_Z_BASE as f32]
                 .iter()
                 .cycle()
                 .take(self.positions.len()),
@@ -111,10 +112,6 @@ impl Widget for Triangles3d {
         } = self;
 
         let (x, y, w, h) = rect.x_y_w_h();
-        let x = x as f32;
-        let y = y as f32;
-        let w = w as f32;
-        let h = h as f32;
         let scale = (w / src_width).min(h / src_height);
         let offset = vec2(x, y) - src_center * scale;
 
@@ -122,7 +119,7 @@ impl Widget for Triangles3d {
             state.positions = positions
                 .into_iter()
                 .zip([true, true, false].iter().cycle())
-                .map(|(v, change)| if *change { v * scale } else { v })
+                .map(|(v, change)| if *change { v * scale as f32 } else { v })
                 .collect();
             state.colors = colors;
             state.indexes = indexes;

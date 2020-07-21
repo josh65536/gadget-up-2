@@ -1,15 +1,17 @@
 extern crate cgmath;
 extern crate conrod_core;
 extern crate conrod_derive;
+extern crate conrod_winit;
 extern crate fnv;
 extern crate itertools;
-extern crate three_d;
+extern crate winit;
+extern crate glow;
 
+mod camera;
 mod bitfield;
 mod gadget;
 mod graphics_ex;
 mod grid;
-mod input;
 mod math;
 mod model;
 mod preset_gadgets;
@@ -18,23 +20,32 @@ mod shape;
 mod ui;
 mod widget;
 
-use cgmath::{vec2, Vector2};
+use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
 use std::cell::RefCell;
 use std::rc::Rc;
-use three_d::gl::Glstruct;
-use three_d::state;
-use three_d::{Vec2, vec3, vec4};
-use three_d::{Camera, Event, Screen, Window};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use web_sys::console;
+use winit::event_loop::{EventLoop, ControlFlow};
+use winit::event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode};
+use winit::event::MouseScrollDelta;
+use winit::dpi::LogicalPosition;
+use winit::window::WindowBuilder;
+use golem::{Context, GolemError, VertexBuffer, ElementBuffer};
+use golem::{ShaderProgram, ShaderDescription, GeometryMode};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::depth::{DepthTestFunction, DepthTestMode};
+use golem::Dimension::{D2, D3, D4};
 
+use camera::Camera;
 use gadget::{Gadget, GadgetDef, Agent};
 use graphics_ex::GraphicsEx;
 use grid::Grid;
 use render::GadgetRenderer;
 use ui::{WidgetIds, Mode};
 use model::Model;
+use math::Vec2;
 
 #[macro_export]
 macro_rules! log {
@@ -55,9 +66,9 @@ macro_rules! log {
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub struct App {
-    gl: Rc<Glstruct>,
+    gl: Rc<Context>,
     camera: Camera,
-    center: Vector2<f64>,
+    center: Vec2,
     height: f64,
     grid: Grid<Gadget>,
     gadget_renderer: GadgetRenderer,
@@ -80,9 +91,8 @@ impl App {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
 
-    pub fn new(gl: &Rc<Glstruct>, ui: &mut Ui, width: u32, height: u32) -> Self {
+    pub fn new(gl: &Rc<Context>, ui: &mut Ui, width: u32, height: u32) -> Self {
         let camera = Camera::new_orthographic(
-            &gl,
             vec3(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, -1.0),
             vec3(0.0, 1.0, 0.0),
@@ -152,26 +162,26 @@ impl App {
 
     pub fn update(&mut self, ui: &mut Ui) {
         self.camera.set_orthographic_projection(
-            (ui.win_w / ui.win_h * self.height) as f32,
-            self.height as f32,
+            ui.win_w / ui.win_h * self.height,
+            self.height,
             1.0,
         );
 
         self.update_ui(ui);
 
-        let cx = self.center.x as f32;
-        let cy = self.center.y as f32;
+        let cx = self.center.x;
+        let cy = self.center.y;
         self.camera.set_view(vec3(cx, cy, 0.0), vec3(cx, cy, -1.0), vec3(0.0, 1.0, 0.0));
     }
 
-    pub fn render(&mut self, ui: &mut Ui, width: f32, height: f32) {
+    pub fn render(&mut self, ui: &mut Ui, width: f64, height: f64) {
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
         if let Some(gadget) = &self.gadget_tile {
             gadget.renderer().model(&self.gl).render_position(
                 vec3(
-                    self.gadget_tile_xy.x as f32,
-                    self.gadget_tile_xy.y as f32,
+                    self.gadget_tile_xy.x as f64,
+                    self.gadget_tile_xy.y as f64,
                     -0.25,
                 ),
                 &self.camera,
@@ -185,53 +195,62 @@ impl App {
         self.render_ui(ui, width, height);
     }
 
-    pub fn handle_input(&mut self, event: &Event) {
+    pub fn handle_input(&mut self, event: &Event<()>) {
         match event {
-            Event::MouseWheel { delta } => {
-                self.height = (self.height + 4.0 * delta)
+            Event::WindowEvent { event: WindowEvent::MouseWheel {delta: MouseScrollDelta::PixelDelta(
+                LogicalPosition {y: delta, ..}
+            ), ..}, ..} => {
+                self.height = (self.height + *delta)
                     .max(Self::HEIGHT_MIN)
                     .min(Self::HEIGHT_MAX)
             }
 
-            Event::Key { state, kind } => {
-                if kind == "R" || kind == "T" {
-                    if let three_d::State::Pressed = state {
-                        if let Some(gadget) = &mut self.gadget_tile {
-                            gadget.rotate_ports(if kind == "R" {1} else {-1});
-                        }
+            Event::WindowEvent { event: WindowEvent::KeyboardInput {input: KeyboardInput {
+                virtual_keycode: Some(keycode), state, ..
+            }, ..}, ..} => {
 
-                        if self.mode == Mode::AgentPlace {
-                            if let Some(agent) = &mut self.agent {
-                                agent.rotate(1);
+                match keycode {
+                    VirtualKeyCode::R | VirtualKeyCode::T => {
+                        if let ElementState::Pressed = state {
+                            if let Some(gadget) = &mut self.gadget_tile {
+                                gadget.rotate_ports(if *keycode == VirtualKeyCode::R {1} else {-1});
+                            }
+
+                            if self.mode == Mode::AgentPlace {
+                                if let Some(agent) = &mut self.agent {
+                                    agent.rotate(1);
+                                }
                             }
                         }
-                    }
-                } else if kind == "F" {
-                    if let three_d::State::Pressed = state {
-                        if let Some(gadget) = &mut self.gadget_tile {
-                            gadget.flip_ports();
+                    },
+
+                    VirtualKeyCode::F => {
+                        if let ElementState::Pressed = state {
+                            if let Some(gadget) = &mut self.gadget_tile {
+                                gadget.flip_ports();
+                            }
                         }
-                    }
-                } else if kind == "C" {
-                    if let three_d::State::Pressed = state {
-                        if let Some(gadget) = &mut self.gadget_tile {
-                            gadget.cycle_state();
+                    },
+
+                    VirtualKeyCode::C => {
+                        if let ElementState::Pressed = state {
+                            if let Some(gadget) = &mut self.gadget_tile {
+                                gadget.cycle_state();
+                            }
                         }
-                    }
+                    },
+
+                    _ => {}
                 }
 
                 if self.mode == Mode::Play {
-                    if let three_d::State::Pressed = state {
-                        let dir = if kind == "W" || kind == "ArrowUp" {
-                            Some(vec2(0, 1))
-                        } else if kind == "A" || kind == "ArrowLeft" {
-                            Some(vec2(-1, 0))
-                        } else if kind == "S" || kind == "ArrowDown" {
-                            Some(vec2(0, -1))
-                        } else if kind == "D" || kind == "ArrowRight" {
-                            Some(vec2(1, 0))
-                        } else {
-                            None
+                    if let ElementState::Pressed = state {
+                        let dir = match keycode {
+                            VirtualKeyCode::W | VirtualKeyCode::Up => Some(vec2(0, 1)),
+                            VirtualKeyCode::A | VirtualKeyCode::Left => Some(vec2(-1, 0)),
+                            VirtualKeyCode::S | VirtualKeyCode::Down => Some(vec2(0, -1)),
+                            VirtualKeyCode::D | VirtualKeyCode::Right => Some(vec2(1, 0)),
+                            _ => None,
                         };
 
                         if let Some(dir) = dir {
@@ -252,62 +271,85 @@ pub fn main_js() -> Result<(), JsValue> {
     // It's disabled in release mode so it doesn't bloat up the file size.
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
+    
+    let event_loop = EventLoop::new();
 
-    let mut window = Window::new_default("Gadget Up! 2").unwrap();
-    let gl = window.gl();
+    let window = WindowBuilder::new().with_title("Gadget Up! 2").build(&event_loop).unwrap();
+    let gl = web_sys::window().unwrap().document().unwrap().get_element_by_id("canvas").unwrap()
+        .dyn_into::<web_sys::HtmlCanvasElement>().map_err(|_| ()).unwrap()
+        .get_context("webgl").expect("init webgl fail 1").expect("init webgl fail 2")
+        .dyn_into::<web_sys::WebGlRenderingContext>().unwrap();
+
+    // This is a hack to get 'rustc' to stop complaining
+    // about this function 'not existing' and move on to
+    // more interesting errors.
+    // 
+    // The `transmute_copy` will not be executed,
+    // though there is a `fake_panic` that doesn't
+    // return and doesn't say it doesn't return, just in case
+    #[cfg(target_arch = "wasm32")]
+    let gl = glow::Context::from_webgl1_context(gl);
+    #[cfg(not(target_arch = "wasm32"))]
+    fake_panic();
+    #[cfg(not(target_arch = "wasm32"))]
+    let gl = unsafe { std::mem::transmute_copy(&()) };
+
+    let gl = Context::from_glow(gl).unwrap();
+
+    gl.set_depth_test_mode(Some(DepthTestMode {
+        depth_mask: true,
+        function: DepthTestFunction::GreaterOrEqual,
+        range_near: -1.0,
+        range_far: 0.0,
+    }));
 
     let mut frame = 0;
     let original_width = crate::window().inner_width().unwrap().as_f64().unwrap() as usize;
     let original_height = crate::window().inner_height().unwrap().as_f64().unwrap() as usize;
 
     let mut ui = UiBuilder::new([original_width as f64, original_height as f64]).build();
-    let mut app = App::new(&gl, &mut ui, original_width as u32, original_height as u32);
+    let mut app = App::new(&Rc::new(gl), &mut ui, original_width as u32, original_height as u32);
 
-    state::depth_write(&gl, true);
-    state::depth_test(&gl, three_d::DepthTestType::GreaterOrEqual);
-    state::blend(&gl, three_d::BlendType::SrcAlphaOneMinusSrcAlpha);
+    event_loop.run(move |event, _, ctrl| {
+        let width = crate::window().inner_width().unwrap().as_f64().unwrap();
+        let height = crate::window().inner_height().unwrap().as_f64().unwrap();
 
-    window
-        .render_loop(move |frame_input| {
-            let width = crate::window().inner_width().unwrap().as_f64().unwrap() as f32;
-            let height = crate::window().inner_height().unwrap().as_f64().unwrap() as f32;
+        *ctrl = ControlFlow::Poll;
 
-            ui.win_w = width as f64;
-            ui.win_h = height as f64;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+            } if window_id == window.id() => *ctrl = ControlFlow::Exit,
 
-            for event in frame_input.events.iter() {
-                app.handle_input(event);
+            Event::MainEventsCleared => {
+                ui.win_w = width;
+                ui.win_h = height;
 
-                if let Some(event) = input::convert(event.clone(), width as f64, height as f64) {
+                app.update(&mut ui);
+                app.render(&mut ui, width, height);
+
+                frame += 1;
+                window.request_redraw();
+            },
+
+            event => {
+                app.handle_input(&event);
+
+                if let Some(event) = conrod_winit::v021_convert_event!(event, &window) {
                     ui.handle_event(event);
                 }
+
+                //log!("width: {}, height: {}", width, height);
             }
-
-            //log!("width: {}, height: {}", width, height);
-
-            app.update(&mut ui);
-
-            Screen::write(
-                &gl,
-                0,
-                0,
-                original_width,
-                original_height,
-                Some(&vec4(0.0, 0.0, 0.0, 1.0)),
-                Some(-1.0),
-                &mut || {
-                    app.render(&mut ui, width, height);
-                },
-            )
-            .unwrap();
-
-            frame += 1;
-        })
-        .unwrap();
-
-    Ok(())
+        }
+    });
 }
 
 fn window() -> web_sys::Window {
     web_sys::window().expect("No window!")
+}
+
+fn fake_panic() {
+    unreachable!();
 }

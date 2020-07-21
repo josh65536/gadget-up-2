@@ -1,16 +1,16 @@
 use cgmath::prelude::*;
-use cgmath::vec2;
+use cgmath::{vec2, vec4};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
-use three_d::gl::Glstruct;
-use three_d::{vec4, Camera, Mat4, Vec2};
+use golem::Context;
 
 use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::math::{Vec2i, Vector2Ex};
+use crate::math::{Vec2i, Vector2Ex, Vec2, Mat4};
 use crate::model::Model;
 use crate::shape::{Circle, Path, Rectangle, Shape};
+use crate::camera::Camera;
 
 pub type Port = u32;
 pub type State = u32;
@@ -190,14 +190,14 @@ impl Gadget {
 
     fn potential_port_positions(&self) -> Vec<Vec2> {
         (0..self.size.0)
-            .map(|i| vec2(0.5 + i as f32, 0.0))
-            .chain((0..self.size.1).map(|i| vec2(self.size.0 as f32, 0.5 + i as f32)))
+            .map(|i| vec2(0.5 + i as f64, 0.0))
+            .chain((0..self.size.1).map(|i| vec2(self.size.0 as f64, 0.5 + i as f64)))
             .chain(
                 (0..self.size.0)
                     .rev()
-                    .map(|i| vec2(0.5 + i as f32, self.size.1 as f32)),
+                    .map(|i| vec2(0.5 + i as f64, self.size.1 as f64)),
             )
-            .chain((0..self.size.1).rev().map(|i| vec2(0.0, 0.5 + i as f32)))
+            .chain((0..self.size.1).rev().map(|i| vec2(0.0, 0.5 + i as f64)))
             .collect()
     }
 
@@ -288,10 +288,10 @@ pub struct GadgetRenderInfo {
 }
 
 impl GadgetRenderInfo {
-    pub const RECTANGLE_Z: f32 = -0.001;
-    const OUTLINE_Z: f32 = -0.002;
-    const PATH_Z: f32 = -0.003;
-    const PORT_Z: f32 = -0.004;
+    pub const RECTANGLE_Z: f64 = -0.001;
+    const OUTLINE_Z: f64 = -0.002;
+    const PATH_Z: f64 = -0.003;
+    const PORT_Z: f64 = -0.004;
 
     fn new() -> Self {
         Self {
@@ -313,9 +313,9 @@ impl GadgetRenderInfo {
             port_positions[ports.0 as usize],
             port_positions[ports.1 as usize],
         ];
-        let mut bezier = [vec2(0f32, 0f32), vec2(0f32, 0f32)];
+        let mut bezier = [vec2(0.0, 0.0), vec2(0.0, 0.0)];
 
-        let offset = 0.25f32;
+        let offset = 0.25;
 
         for (pos, bez) in positions.iter().zip(bezier.iter_mut()) {
             *bez = pos
@@ -367,9 +367,9 @@ impl GadgetRenderInfo {
         // Surrounding rectangle
         let rect = Rectangle::new(
             0.0,
-            gadget.size().0 as f32,
+            gadget.size().0 as f64,
             0.0,
-            gadget.size().1 as f32,
+            gadget.size().1 as f64,
             GadgetRenderInfo::RECTANGLE_Z,
         );
         rect.append_to(&mut self.positions, &mut self.indexes);
@@ -395,9 +395,9 @@ impl GadgetRenderInfo {
             let path = Path::new(
                 vec![
                     vec2(0.0, 0.0),
-                    vec2(0.0, gadget.size().1 as f32),
-                    vec2(gadget.size().0 as f32, gadget.size().1 as f32),
-                    vec2(gadget.size().0 as f32, 0.0),
+                    vec2(0.0, gadget.size().1 as f64),
+                    vec2(gadget.size().0 as f64, gadget.size().1 as f64),
+                    vec2(gadget.size().0 as f64, 0.0),
                 ],
                 GadgetRenderInfo::OUTLINE_Z,
                 0.05,
@@ -441,7 +441,12 @@ impl GadgetRenderInfo {
                 let v2 = end + dir * -0.2 + dir.right_ccw() * 0.1;
 
                 let old_len = self.positions().len() as u32 / 3;
-                self.positions.extend(&[v0.x, v0.y, GadgetRenderInfo::PATH_Z, end.x, end.y, GadgetRenderInfo::PATH_Z, v2.x, v2.y, GadgetRenderInfo::PATH_Z]);
+                #[rustfmt::skip]
+                self.positions.extend(&[
+                    v0.x as f32, v0.y as f32, GadgetRenderInfo::PATH_Z as f32,
+                    end.x as f32, end.y as f32, GadgetRenderInfo::PATH_Z as f32,
+                    v2.x as f32, v2.y as f32, GadgetRenderInfo::PATH_Z as f32,
+                ]);
                 self.colors.extend([0.0, 0.0, 0.0, 1.0].iter().cycle().take(4 * 3));
                 self.indexes.extend(&[old_len, old_len + 1, old_len + 2]);
             }
@@ -452,7 +457,7 @@ impl GadgetRenderInfo {
         &self.colors
     }
 
-    pub fn model(&self, gl: &Rc<Glstruct>) -> Ref<Model> {
+    pub fn model(&self, gl: &Rc<Context>) -> Ref<Model> {
         {
             let mut model = self.model.borrow_mut();
 
@@ -594,13 +599,13 @@ impl Agent {
     }
 
     pub fn render(&self, camera: &Camera) {
-        let dir = self.direction.cast::<f32>().unwrap();
+        let dir = self.direction.cast::<f64>().unwrap();
 
         let transform = Mat4::from_cols(
             -dir.right_ccw().extend(0.0).extend(0.0),
             dir.extend(0.0).extend(0.0),
             vec4(0.0, 0.0, 1.0, 0.0),
-            (self.double_xy.cast::<f32>().unwrap() * 0.5)
+            (self.double_xy.cast::<f64>().unwrap() * 0.5)
                 .extend(-0.1)
                 .extend(1.0),
         );
@@ -608,7 +613,7 @@ impl Agent {
     }
 
     /// Returns the model that an agent uses
-    pub fn new_shared_model(gl: &Rc<Glstruct>) -> Model {
+    pub fn new_shared_model(gl: &Rc<Context>) -> Model {
         let positions: Vec<f32> = vec![
             0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15, 0.0,
         ];

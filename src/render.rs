@@ -1,12 +1,16 @@
 use crate::gadget::{Gadget, GadgetRenderInfo};
 use crate::grid::{Grid, WH, XY};
+use crate::math::ToArray;
 use crate::log;
 use crate::shape::{Rectangle, Shape};
+use crate::camera::Camera;
 
 use std::rc::Rc;
-use three_d::core::Error;
-use three_d::gl::Glstruct;
-use three_d::{Camera, ElementBuffer, Program, VertexBuffer};
+use itertools::izip;
+use golem::{Context, ShaderDescription, ShaderProgram};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{VertexBuffer, ElementBuffer, GeometryMode};
+use golem::Dimension::{D2, D3, D4};
 
 /// Takes a grid and renders it. Assumes the grid is on the XY plane,
 /// with X in the grid pointing in the X direction
@@ -54,22 +58,40 @@ pub trait GridItemRenderer {
 }
 
 pub struct GadgetRenderer {
-    program: Program,
-    gl: Rc<Glstruct>,
+    program: ShaderProgram,
+    gl: Rc<Context>,
     positions: Vec<f32>,
     offsets: Vec<f32>,
     colors: Vec<f32>,
     indexes: Vec<u32>,
+    vertex_buffer: VertexBuffer,
+    index_buffer: ElementBuffer,
 }
 
 impl GadgetRenderer {
-    pub fn new(gl: &Rc<Glstruct>) -> Self {
-        let program = Program::from_source(
-            gl,
-            include_str!("../assets/shaders/offset.vert"),
-            include_str!("../assets/shaders/basic.frag"),
-        )
-        .unwrap();
+    pub fn new(gl: &Rc<Context>) -> Self {
+        let program = ShaderProgram::new(gl,
+            ShaderDescription {
+                vertex_input: &[
+                    Attribute::new("v_position", AttributeType::Vector(D3)),
+                    Attribute::new("v_offset", AttributeType::Vector(D3)),
+                    Attribute::new("v_color", AttributeType::Vector(D4)),
+                ],
+                fragment_input: &[
+                    Attribute::new("f_color", AttributeType::Vector(D4)),
+                ],
+                uniforms: &[
+                    Uniform::new("transform", UniformType::Matrix(D4)),
+                ],
+                vertex_shader: r#"void main() {
+                    f_color = v_color;
+                    gl_Position = transform * vec4(v_position + v_offset, 1.0);
+                }"#,
+                fragment_shader: r#"void main() {
+                    gl_FragColor = f_color;
+                }"#,
+            }
+        ).unwrap();
 
         Self {
             program,
@@ -78,6 +100,8 @@ impl GadgetRenderer {
             offsets: vec![],
             colors: vec![],
             indexes: vec![],
+            vertex_buffer: VertexBuffer::new(gl).unwrap(),
+            index_buffer: ElementBuffer::new(gl).unwrap(),
         }
     }
 
@@ -127,33 +151,18 @@ impl GridItemRenderer for GadgetRenderer {
     /// Finalize the rendering of the grid
     fn end(&mut self, camera: &Camera) {
         let world_view_projection = camera.get_projection() * camera.get_view();
-        self.program
-            .add_uniform_mat4("worldViewProjectionMatrix", &world_view_projection)
-            .unwrap();
 
-        let positions = VertexBuffer::new_with_static_f32(&self.gl, &self.positions).unwrap();
-        let offsets = VertexBuffer::new_with_static_f32(&self.gl, &self.offsets).unwrap();
-        let colors = VertexBuffer::new_with_static_f32(&self.gl, &self.colors).unwrap();
-        let elements = ElementBuffer::new_with_u32(&self.gl, &self.indexes).unwrap();
+        self.program.bind();
+        self.program.set_uniform("transform", UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array())).unwrap();
 
-        //        log!(
-        //            "{}, {}, {}, {}",
-        //            self.positions.len(),
-        //            self.offsets.len(),
-        //            self.colors.len(),
-        //            self.indexes.len()
-        //        );
-        //
-        self.program
-            .use_attribute_vec3_float(&positions, "position")
-            .unwrap();
-        self.program
-            .use_attribute_vec3_float(&offsets, "offset")
-            .unwrap();
-        self.program
-            .use_attribute_vec4_float(&colors, "color")
-            .unwrap();
+        let vertices = izip!(self.positions.chunks(3), self.offsets.chunks(3), self.colors.chunks(4))
+            .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter())).copied().collect::<Vec<_>>();
 
-        self.program.draw_elements(&elements);
+        self.vertex_buffer.set_data(&vertices);
+        self.index_buffer.set_data(&self.indexes);
+
+        unsafe {
+            self.program.draw(&self.vertex_buffer, &self.index_buffer, 0..self.indexes.len(), GeometryMode::Triangles);
+        }
     }
 }

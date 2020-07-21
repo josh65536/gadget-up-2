@@ -1,17 +1,23 @@
+use cgmath::vec3;
 use conrod_core::render::{Primitive, PrimitiveKind, PrimitiveWalker};
 use conrod_core::Widget;
 use std::rc::Rc;
-use three_d::gl::Glstruct;
-use three_d::{vec3, Camera, ElementBuffer, Program, VertexBuffer};
+use golem::{Context, ShaderDescription, ShaderProgram};
+use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{VertexBuffer, ElementBuffer, GeometryMode};
+use golem::Dimension::{D2, D3, D4};
+use itertools::izip;
 
 use crate::log;
+use crate::math::ToArray;
+use crate::camera::Camera;
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;
 
 pub struct GraphicsEx {
-    gl: Rc<Glstruct>,
+    gl: Rc<Context>,
     pub camera: Camera,
-    program: Program,
+    program: ShaderProgram,
     /// 3 coordinates (XYZ) per vertex
     pub positions: Vec<f32>,
     /// 3 coordinates (XYZ) per offset
@@ -20,15 +26,16 @@ pub struct GraphicsEx {
     pub colors: Vec<f32>,
     /// 3 indexes per triangle
     pub indexes: Vec<u32>,
+    vertex_buffer: VertexBuffer,
+    index_buffer: ElementBuffer,
 }
 
 impl GraphicsEx {
-    pub const UI_Z_BASE: f32 = -0.9;
+    pub const UI_Z_BASE: f64 = -0.9;
 
-    pub fn new(gl: &Rc<Glstruct>) -> Self {
+    pub fn new(gl: &Rc<Context>) -> Self {
         // dummy values
         let camera = Camera::new_orthographic(
-            gl,
             vec3(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, -1.0),
             vec3(0.0, 1.0, 0.0),
@@ -37,12 +44,28 @@ impl GraphicsEx {
             1.0,
         );
 
-        let program = Program::from_source(
-            gl,
-            include_str!("../assets/shaders/offset.vert"),
-            include_str!("../assets/shaders/basic.frag"),
-        )
-        .unwrap();
+        let program = ShaderProgram::new(gl,
+            ShaderDescription {
+                vertex_input: &[
+                    Attribute::new("v_position", AttributeType::Vector(D3)),
+                    Attribute::new("v_offset", AttributeType::Vector(D3)),
+                    Attribute::new("v_color", AttributeType::Vector(D4)),
+                ],
+                fragment_input: &[
+                    Attribute::new("f_color", AttributeType::Vector(D4)),
+                ],
+                uniforms: &[
+                    Uniform::new("transform", UniformType::Matrix(D4)),
+                ],
+                vertex_shader: r#"void main() {
+                    f_color = v_color;
+                    gl_Position = transform * vec4(v_position + v_offset, 1.0);
+                }"#,
+                fragment_shader: r#"void main() {
+                    gl_FragColor = f_color;
+                }"#,
+            }
+        ).unwrap();
 
         Self {
             gl: Rc::clone(gl),
@@ -52,11 +75,13 @@ impl GraphicsEx {
             offsets: vec![],
             colors: vec![],
             indexes: vec![],
+            vertex_buffer: VertexBuffer::new(gl).unwrap(),
+            index_buffer: ElementBuffer::new(gl).unwrap(),
         }
     }
 
     /// Starts the drawing process
-    pub fn draw_begin(&mut self, width: f32, height: f32) {
+    pub fn draw_begin(&mut self, width: f64, height: f64) {
         self.positions.clear();
         self.offsets.clear();
         self.colors.clear();
@@ -67,36 +92,25 @@ impl GraphicsEx {
     /// Finishes the drawing process
     pub fn draw_end(&mut self) {
         let world_view_projection = self.camera.get_projection() * self.camera.get_view();
-        self.program
-            .add_uniform_mat4("worldViewProjectionMatrix", &world_view_projection)
-            .unwrap();
 
-        let positions = VertexBuffer::new_with_static_f32(&self.gl, &self.positions).unwrap();
-        let offsets = VertexBuffer::new_with_static_f32(&self.gl, &self.offsets).unwrap();
-        let colors = VertexBuffer::new_with_static_f32(&self.gl, &self.colors).unwrap();
-        let elements = ElementBuffer::new_with_u32(&self.gl, &self.indexes).unwrap();
+        self.program.bind();
+        self.program.set_uniform("transform", UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array())).unwrap();
 
-        self.program
-            .use_attribute_vec3_float(&positions, "position")
-            .unwrap();
-        self.program
-            .use_attribute_vec3_float(&offsets, "offset")
-            .unwrap();
-        self.program
-            .use_attribute_vec4_float(&colors, "color")
-            .unwrap();
+        let vertices = izip!(self.positions.chunks(3), self.offsets.chunks(3), self.colors.chunks(4))
+            .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter())).copied().collect::<Vec<_>>();
 
-        self.program.draw_elements(&elements);
+        self.vertex_buffer.set_data(&vertices);
+        self.index_buffer.set_data(&self.indexes);
+
+        unsafe {
+            self.program.draw(&self.vertex_buffer, &self.index_buffer, 0..self.indexes.len(), GeometryMode::Triangles);
+        }
     }
 
     pub fn primitive(&mut self, p: Primitive) {
         let Primitive { id, kind, rect, .. } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
-        let x = x as f32;
-        let y = y as f32;
-        let w = w as f32;
-        let h = h as f32;
 
         match kind {
             PrimitiveKind::Rectangle { color } => {
@@ -105,7 +119,7 @@ impl GraphicsEx {
                 rect.append_to(&mut self.positions, &mut self.indexes);
 
                 self.offsets
-                    .extend([x, y, GraphicsEx::UI_Z_BASE].iter().cycle().take(4 * 3));
+                    .extend([x as f32, y as f32, GraphicsEx::UI_Z_BASE as f32].iter().cycle().take(4 * 3));
                 let rgba = color.to_rgb();
                 self.colors
                     .extend([rgba.0, rgba.1, rgba.2, rgba.3].iter().cycle().take(4 * 4));
@@ -133,7 +147,7 @@ impl GraphicsEx {
                 self.indexes.extend(p_len..(p_len + t_len));
 
                 self.offsets.extend(
-                    [0.0, 0.0, GraphicsEx::UI_Z_BASE]
+                    [0.0, 0.0, GraphicsEx::UI_Z_BASE as f32]
                         .iter()
                         .cycle()
                         .take(t_len as usize * 3),
@@ -165,7 +179,7 @@ impl GraphicsEx {
                 self.indexes.extend(p_len..(p_len + t_len));
 
                 self.offsets.extend(
-                    [0.0, 0.0, GraphicsEx::UI_Z_BASE]
+                    [0.0, 0.0, GraphicsEx::UI_Z_BASE as f32]
                         .iter()
                         .cycle()
                         .take(t_len as usize * 3),

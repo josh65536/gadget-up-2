@@ -166,7 +166,7 @@ impl App {
         }
     }
 
-    pub fn render_ui(&mut self, ui: &mut Ui, width: f32, height: f32) {
+    pub fn render_ui(&mut self, ui: &mut Ui, width: f64, height: f64) {
         self.ui_renderer.draw_begin(width, height);
 
         let mut primitives = ui.draw();

@@ -1,10 +1,19 @@
 use cgmath::prelude::*;
 use cgmath::BaseNum;
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector3, Vector4, Point3, Matrix4, Deg, Rad};
 use std::ops::Neg;
 
 pub const TAUf32: f32 = std::f32::consts::PI * 2.0;
 pub const TAUf64: f64 = std::f64::consts::PI * 2.0;
+
+pub type Vec2i = Vector2<i32>;
+pub type Vec2 = Vector2<f64>;
+pub type Vec3 = Vector3<f64>;
+pub type Vec4 = Vector4<f64>;
+pub type Mat4 = Matrix4<f64>;
+pub type Pt3 = Point3<f64>;
+pub type Degrees = Deg<f64>;
+pub type Radians = Rad<f64>;
 
 pub trait Vector2Ex<S: BaseNum + Neg> {
     /// Rotates the vector 90 degrees counterclockwise
@@ -27,4 +36,47 @@ where
     }
 }
 
-pub type Vec2i = Vector2<i32>;
+/// Useful for rendering
+pub trait ToArray {
+    type Array;
+
+    fn to_array(&self) -> Self::Array;
+}
+
+impl ToArray for Vector2<f32> {
+    type Array = [f32; 2];
+
+    fn to_array(&self) -> Self::Array {
+        [self.x, self.y]
+    }
+}
+
+impl ToArray for Vector3<f32> {
+    type Array = [f32; 3];
+
+    fn to_array(&self) -> Self::Array {
+        [self.x, self.y, self.z]
+    }
+}
+
+impl ToArray for Vector4<f32> {
+    type Array = [f32; 4];
+
+    fn to_array(&self) -> Self::Array {
+        [self.x, self.y, self.z, self.w]
+    }
+}
+
+impl ToArray for Matrix4<f32> {
+    type Array = [f32; 16];
+
+    #[rustfmt::skip]
+    fn to_array(&self) -> Self::Array {
+        [
+            self.x.x, self.x.y, self.x.z, self.x.w,
+            self.y.x, self.y.y, self.y.z, self.y.w,
+            self.z.x, self.z.y, self.z.z, self.z.w,
+            self.w.x, self.w.y, self.w.z, self.w.w,
+        ]
+    }
+}
