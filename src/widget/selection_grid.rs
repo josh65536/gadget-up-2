@@ -3,9 +3,6 @@ use conrod_core::{builder_method, widget_ids};
 use conrod_core::{Color, Colorable, Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
-
-
-
 use super::button::Button;
 use super::triangles3d::Triangles3d;
 use crate::gadget::Gadget;

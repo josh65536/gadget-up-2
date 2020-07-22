@@ -1,4 +1,3 @@
-
 use cgmath::BaseNum;
 use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 use std::ops::Neg;
@@ -33,50 +32,5 @@ where
 
     fn dot_ex(self, other: Self) -> S {
         self.x * other.x + self.y * other.y
-    }
-}
-
-/// Useful for rendering
-pub trait ToArray {
-    type Array;
-
-    fn to_array(&self) -> Self::Array;
-}
-
-impl ToArray for Vector2<f32> {
-    type Array = [f32; 2];
-
-    fn to_array(&self) -> Self::Array {
-        [self.x, self.y]
-    }
-}
-
-impl ToArray for Vector3<f32> {
-    type Array = [f32; 3];
-
-    fn to_array(&self) -> Self::Array {
-        [self.x, self.y, self.z]
-    }
-}
-
-impl ToArray for Vector4<f32> {
-    type Array = [f32; 4];
-
-    fn to_array(&self) -> Self::Array {
-        [self.x, self.y, self.z, self.w]
-    }
-}
-
-impl ToArray for Matrix4<f32> {
-    type Array = [f32; 16];
-
-    #[rustfmt::skip]
-    fn to_array(&self) -> Self::Array {
-        [
-            self.x.x, self.x.y, self.x.z, self.x.w,
-            self.y.x, self.y.y, self.y.z, self.y.w,
-            self.z.x, self.z.y, self.z.z, self.z.w,
-            self.w.x, self.w.y, self.w.z, self.w.w,
-        ]
     }
 }

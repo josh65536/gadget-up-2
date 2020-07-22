@@ -8,12 +8,9 @@ extern crate itertools;
 extern crate winit;
 
 mod bitfield;
-mod camera;
 mod gadget;
-mod graphics_ex;
 mod grid;
 mod math;
-mod model;
 mod preset_gadgets;
 mod render;
 mod shape;
@@ -22,33 +19,30 @@ mod widget;
 
 use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
-use golem::depth::{DepthTestFunction, DepthTestMode};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
 use golem::blend::{BlendInput, BlendMode, BlendOperation};
+use golem::depth::{DepthTestFunction, DepthTestMode};
 use golem::ShaderProgram;
 
-use golem::{Context};
-
+use golem::Context;
 
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-#[cfg(target_arch = "wasm32")]
-use winit::platform::web::WindowExtWebSys;
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::MouseScrollDelta;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
 use winit::window::WindowBuilder;
 
-use camera::Camera;
 use gadget::{Agent, Gadget, GadgetDef};
-use graphics_ex::GraphicsEx;
 use grid::Grid;
 use math::Vec2;
-use model::Model;
-use render::GadgetRenderer;
+use render::{Camera, GadgetRenderer, Model, UiRenderer};
+use render::{ShaderMap, ShaderType, ModelMap, ModelType, TrianglesMap, TrianglesType};
 use ui::{Mode, WidgetIds};
 
 #[macro_export]
@@ -71,8 +65,9 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub struct App {
     gl: Rc<Context>,
-    shaders: Vec<Rc<ShaderProgram>>,
-    models: Vec<Rc<Model>>,
+    shaders: ShaderMap,
+    triangleses: TrianglesMap,
+    models: ModelMap,
     camera: Camera,
     center: Vec2,
     height: f64,
@@ -84,13 +79,13 @@ pub struct App {
     /// The gadget currently being used to paint tiles
     gadget_tile: Option<Gadget>,
     gadget_tile_xy: grid::XY,
+    gadget_tile_model: Option<Model>,
     agent: Option<Agent>,
     agent_position: Vec2,
-    agent_model: Rc<Model>,
     gadget_select_rep: Gadget,
     mode: Mode,
     ids: WidgetIds,
-    ui_renderer: GraphicsEx,
+    ui_renderer: UiRenderer,
 }
 
 impl App {
@@ -136,27 +131,32 @@ impl App {
         let gadget_select_rep = Gadget::new(&Rc::new(def), (1, 1), vec![], 0);
 
         let widget_ids = WidgetIds::new(ui.widget_id_generator());
+        
+        let shaders = render::shader_map(gl);
+        let triangleses = render::triangles_map(gl);
+        let models = render::model_map(gl, &shaders, &triangleses);
 
         Self {
             gl: Rc::clone(gl),
-            shaders: vec![],
-            models: vec![],
+            shaders,
+            triangleses,
+            models,
             camera,
             center: vec2(0.0, 0.0),
             height: 10.0,
             grid,
-            gadget_renderer: GadgetRenderer::new(&gl),
+            gadget_renderer: GadgetRenderer::new(&gl, &shaders),
             gadget_select: preset_gadgets::preset_gadgets(),
             gadget_selection: None,
             gadget_tile: None,
             gadget_tile_xy: vec2(0, 0),
+            gadget_tile_model: None,
             agent: None,
             agent_position: vec2(0.0, 0.0),
-            agent_model: Rc::new(Agent::new_shared_model(gl)),
             gadget_select_rep,
             mode: Mode::None,
             ids: widget_ids,
-            ui_renderer: GraphicsEx::new(&gl),
+            ui_renderer: UiRenderer::new(&gl),
         }
     }
 
@@ -180,15 +180,17 @@ impl App {
 
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
-        if let Some(gadget) = &self.gadget_tile {
-            gadget.renderer().model(&self.gl).prepare_render().render_position(
-                vec3(
-                    self.gadget_tile_xy.x as f64,
-                    self.gadget_tile_xy.y as f64,
-                    -0.25,
-                ),
-                &self.camera,
-            );
+        if let Some(model) = &self.gadget_tile_model {
+            model
+                .prepare_render()
+                .render_position(
+                    vec3(
+                        self.gadget_tile_xy.x as f64,
+                        self.gadget_tile_xy.y as f64,
+                        -0.25,
+                    ),
+                    &self.camera,
+                );
         }
 
         if let Some(agent) = &self.agent {
@@ -323,7 +325,14 @@ pub fn main_js() -> Result<(), JsValue> {
             style.remove_property("height").unwrap();
             style.set_property("cursor", "auto");
 
-            web_sys::window().unwrap().document().unwrap().body().unwrap().append_child(&canvas).unwrap();
+            web_sys::window()
+                .unwrap()
+                .document()
+                .unwrap()
+                .body()
+                .unwrap()
+                .append_child(&canvas)
+                .unwrap();
 
             let gl = canvas
                 .get_context("webgl")
@@ -394,8 +403,11 @@ pub fn main_js() -> Result<(), JsValue> {
             event => {
                 app.handle_input(&event);
 
-                if let Some(event) = conrod_winit::v021_convert_event_wh!(event,
-                    PhysicalSize::new(width, height), window.scale_factor()) {
+                if let Some(event) = conrod_winit::v021_convert_event_wh!(
+                    event,
+                    PhysicalSize::new(width, height),
+                    window.scale_factor()
+                ) {
                     ui.handle_event(event);
                 }
 

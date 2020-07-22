@@ -3,16 +3,16 @@ use cgmath::{vec2, vec4, Vector2};
 
 use conrod_core::input::widget::Mouse;
 use conrod_core::widget::{self, Widget};
+use conrod_core::widget_ids;
 use conrod_core::Point;
-use conrod_core::{widget_ids};
 use conrod_core::{Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
-use crate::camera::Camera;
+use crate::bitfield;
 use crate::grid::XY;
 use crate::math::Vec2;
+use crate::render::Camera;
 use crate::ui::Mode;
-use crate::{bitfield};
 
 widget_ids! {
     pub struct Ids {

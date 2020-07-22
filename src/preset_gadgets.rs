@@ -146,7 +146,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let mismatched_crumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let mismatched_crumbler =
+        Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
     def = Rc::new(GadgetDef::from_traversals(
         2,

@@ -3,7 +3,6 @@ use fnv::FnvHashMap;
 use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
-
 use crate::math::Vec2i;
 
 pub type XY = Vec2i;

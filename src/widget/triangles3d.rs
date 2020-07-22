@@ -4,8 +4,7 @@ use conrod_core::Widget;
 use conrod_derive::WidgetCommon;
 
 use crate::gadget::Gadget;
-use crate::graphics_ex::GraphicsEx;
-
+use crate::render::{UiRenderer, TrianglesEx};
 use crate::math::Vec2;
 use crate::shape::Shape;
 
@@ -14,9 +13,8 @@ use crate::shape::Shape;
 pub struct Triangles3d {
     #[conrod(common_builder)]
     common: widget::CommonBuilder,
-    positions: Vec<f32>,
-    colors: Vec<f32>,
-    indexes: Vec<u32>,
+    /// Extra attributes: scale (vec2), offset (vec3)
+    triangles: TrianglesEx<[f32; 5]>,
     // These get mapped onto the bounding rectangle.
     src_center: Vec2,
     src_width: f64,
@@ -25,18 +23,14 @@ pub struct Triangles3d {
 
 impl Triangles3d {
     pub fn new(
-        positions: Vec<f32>,
-        colors: Vec<f32>,
-        indexes: Vec<u32>,
+        triangles: TrianglesEx<[f32; 5]>,
         src_center: Vec2,
         src_width: f64,
         src_height: f64,
     ) -> Self {
         Self {
             common: widget::CommonBuilder::default(),
-            positions,
-            colors,
-            indexes,
+            triangles,
             src_center,
             src_width,
             src_height,
@@ -49,9 +43,7 @@ impl Triangles3d {
 
         Self {
             common: widget::CommonBuilder::default(),
-            positions: gadget.renderer().positions(),
-            colors: gadget.renderer().colors().clone(),
-            indexes: gadget.renderer().indexes(),
+            triangles: gadget.renderer().triangles().clone().with_default_extra(),
             src_center: vec2(width / 2.0, height / 2.0),
             src_width: width,
             src_height: height,
@@ -60,38 +52,18 @@ impl Triangles3d {
 }
 
 pub struct State {
-    positions: Vec<f32>,
-    colors: Vec<f32>,
-    indexes: Vec<u32>,
-    offset: Vec2,
+    triangles: TrianglesEx<[f32; 5]>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            positions: vec![],
-            colors: vec![],
-            indexes: vec![],
-            offset: vec2(0.0, 0.0),
+            triangles: TrianglesEx::default(),
         }
     }
 
-    pub fn render(&self, g: &mut GraphicsEx) {
-        let old_len = g.positions.len() as u32 / 3;
-
-        g.positions.extend(self.positions.iter());
-        g.offsets.extend(
-            [
-                self.offset.x as f32,
-                self.offset.y as f32,
-                GraphicsEx::UI_Z_BASE as f32,
-            ]
-            .iter()
-            .cycle()
-            .take(self.positions.len()),
-        );
-        g.colors.extend(self.colors.iter());
-        g.indexes.extend(self.indexes.iter().map(|i| *i + old_len));
+    pub fn render(&self, g: &mut UiRenderer) {
+        g.triangles.append(self.triangles.clone());
     }
 }
 
@@ -112,9 +84,7 @@ impl Widget for Triangles3d {
         let widget::UpdateArgs { state, rect, .. } = args;
 
         let Self {
-            positions,
-            colors,
-            indexes,
+            triangles,
             src_center,
             src_width,
             src_height,
@@ -125,15 +95,12 @@ impl Widget for Triangles3d {
         let scale = (w / src_width).min(h / src_height);
         let offset = vec2(x, y) - src_center * scale;
 
+        for v in triangles.vertices_mut() {
+            v.extra = [scale as f32, scale as f32, offset.x as f32, offset.y as f32, 0.0];
+        }
+
         state.update(|state| {
-            state.positions = positions
-                .into_iter()
-                .zip([true, true, false].iter().cycle())
-                .map(|(v, change)| if *change { v * scale as f32 } else { v })
-                .collect();
-            state.colors = colors;
-            state.indexes = indexes;
-            state.offset = offset;
+            state.triangles = triangles;
         })
     }
 }

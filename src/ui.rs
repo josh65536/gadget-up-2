@@ -3,12 +3,11 @@ use conrod_core::position::{Align, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
 use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix};
 use conrod_core::widget_ids;
+use conrod_core::Ui;
 use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
-use conrod_core::{Ui};
 
 use crate::gadget::Agent;
-
-
+use crate::render::{Model, ShaderType, TrianglesEx, TrianglesType, ModelType};
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
 
@@ -36,6 +35,7 @@ impl App {
             if mode != Mode::TilePaint {
                 self.gadget_selection = None;
                 self.gadget_tile = None;
+                self.gadget_tile_model = None;
             }
 
             if mode != Mode::AgentPlace && mode != Mode::Play {
@@ -136,10 +136,7 @@ impl App {
             ];
             let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
 
-            for _ in Button::triangles(Triangles3d::new(
-                positions,
-                colors,
-                indexes,
+            for _ in Button::triangles(Triangles3d::new(self.triangleses[&TrianglesType::Agent].clone().with_default_extra(),
                 vec2(0.0, 0.0),
                 0.3,
                 0.3,
@@ -157,7 +154,7 @@ impl App {
                 self.agent = Some(Agent::new(
                     self.agent_position,
                     vec2(0, 1),
-                    &self.agent_model,
+                    &self.models[&ModelType::Agent],
                 ));
             }
         }
@@ -177,7 +174,14 @@ impl App {
             if let Some(selection) = selection {
                 self.set_mode(Mode::TilePaint);
                 self.gadget_selection = Some(selection);
-                self.gadget_tile = Some(self.gadget_select[selection].clone());
+                
+                let gadget = self.gadget_select[selection].clone();
+                self.gadget_tile_model = Some(Model::new(
+                    &self.gl,
+                    &self.shaders[&ShaderType::Basic],
+                    gadget.renderer().triangles()
+                ));
+                self.gadget_tile = Some(gadget);
             }
         }
     }

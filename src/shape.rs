@@ -1,7 +1,6 @@
 use cgmath::prelude::*;
 use itertools::izip;
 
-
 use crate::math::TAUf64;
 use crate::math::{Vec2, Vector2Ex};
 

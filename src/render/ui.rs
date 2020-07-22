@@ -8,29 +8,21 @@ use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use itertools::izip;
 use std::rc::Rc;
 
-use crate::camera::Camera;
+use super::{Camera, TrianglesEx};
 use crate::log;
-use crate::math::ToArray;
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;
 
-pub struct GraphicsEx {
+pub struct UiRenderer {
     gl: Rc<Context>,
     pub camera: Camera,
     program: ShaderProgram,
-    /// 3 coordinates (XYZ) per vertex
-    pub positions: Vec<f32>,
-    /// 3 coordinates (XYZ) per offset
-    pub offsets: Vec<f32>,
-    /// 4 components (RGBA) per color
-    pub colors: Vec<f32>,
-    /// 3 indexes per triangle
-    pub indexes: Vec<u32>,
+    pub triangles: TrianglesEx<[f32; 5]>,
     vertex_buffer: VertexBuffer,
     index_buffer: ElementBuffer,
 }
 
-impl GraphicsEx {
+impl UiRenderer {
     pub const UI_Z_BASE: f64 = -0.9;
 
     pub fn new(gl: &Rc<Context>) -> Self {
@@ -69,10 +61,7 @@ impl GraphicsEx {
             gl: Rc::clone(gl),
             camera,
             program,
-            positions: vec![],
-            offsets: vec![],
-            colors: vec![],
-            indexes: vec![],
+            triangles: TrianglesEx::default(),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
         }
@@ -80,10 +69,7 @@ impl GraphicsEx {
 
     /// Starts the drawing process
     pub fn draw_begin(&mut self, width: f64, height: f64) {
-        self.positions.clear();
-        self.offsets.clear();
-        self.colors.clear();
-        self.indexes.clear();
+        self.triangles.clear();
         self.camera.set_orthographic_projection(width, height, 1.0);
     }
 
@@ -95,34 +81,29 @@ impl GraphicsEx {
         self.program
             .set_uniform(
                 "transform",
-                UniformValue::Matrix4(world_view_projection.cast::<f32>().unwrap().to_array()),
+                UniformValue::Matrix4(*world_view_projection.cast::<f32>().unwrap().as_ref()),
             )
             .unwrap();
 
-        let vertices = izip!(
-            self.positions.chunks(3),
-            self.offsets.chunks(3),
-            self.colors.chunks(4)
-        )
-        .flat_map(|(p, o, c)| p.iter().chain(o.iter()).chain(c.iter()))
-        .copied()
-        .collect::<Vec<_>>();
-
-        self.vertex_buffer.set_data(&vertices);
-        self.index_buffer.set_data(&self.indexes);
+        self.vertex_buffer.set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
+        self.index_buffer.set_data(&self.triangles.indexes());
 
         unsafe {
-            self.program.draw(
-                &self.vertex_buffer,
-                &self.index_buffer,
-                0..self.indexes.len(),
-                GeometryMode::Triangles,
-            ).unwrap();
+            self.program
+                .draw(
+                    &self.vertex_buffer,
+                    &self.index_buffer,
+                    0..self.triangles.indexes().len(),
+                    GeometryMode::Triangles,
+                )
+                .unwrap();
         }
     }
 
     pub fn primitive(&mut self, p: Primitive) {
-        let Primitive { id: _, kind, rect, .. } = p;
+        let Primitive {
+            id: _, kind, rect, ..
+        } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
 
@@ -133,7 +114,7 @@ impl GraphicsEx {
                 rect.append_to(&mut self.positions, &mut self.indexes);
 
                 self.offsets.extend(
-                    [x as f32, y as f32, GraphicsEx::UI_Z_BASE as f32]
+                    [x as f32, y as f32, UiRenderer::UI_Z_BASE as f32]
                         .iter()
                         .cycle()
                         .take(4 * 3),
@@ -165,7 +146,7 @@ impl GraphicsEx {
                 self.indexes.extend(p_len..(p_len + t_len));
 
                 self.offsets.extend(
-                    [0.0, 0.0, GraphicsEx::UI_Z_BASE as f32]
+                    [0.0, 0.0, UiRenderer::UI_Z_BASE as f32]
                         .iter()
                         .cycle()
                         .take(t_len as usize * 3),
@@ -197,7 +178,7 @@ impl GraphicsEx {
                 self.indexes.extend(p_len..(p_len + t_len));
 
                 self.offsets.extend(
-                    [0.0, 0.0, GraphicsEx::UI_Z_BASE as f32]
+                    [0.0, 0.0, UiRenderer::UI_Z_BASE as f32]
                         .iter()
                         .cycle()
                         .take(t_len as usize * 3),

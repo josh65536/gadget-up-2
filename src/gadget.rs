@@ -5,10 +5,9 @@ use golem::Context;
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
 
-use crate::camera::Camera;
 use crate::grid::{Grid, WH, XY};
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
-use crate::model::Model;
+use crate::render::{Camera, Model, ShaderMap, ShaderType, Triangles};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 pub type Port = u32;
@@ -276,14 +275,8 @@ impl Clone for Gadget {
 }
 
 pub struct GadgetRenderInfo {
-    /// 3 coordinates per position
-    positions: Vec<f32>,
-    /// 3 components per color
-    colors: Vec<f32>,
-    /// 3 indexes per triangle
-    indexes: Vec<u32>,
+    triangles: Triangles,
     paths: FnvHashMap<PP, Path>,
-    model: RefCell<Option<Model>>,
 }
 
 impl GadgetRenderInfo {
@@ -292,13 +285,14 @@ impl GadgetRenderInfo {
     const PATH_Z: f64 = -0.003;
     const PORT_Z: f64 = -0.004;
 
+    pub fn triangles(&self) -> &Triangles {
+        &self.triangles
+    }
+
     fn new() -> Self {
         Self {
-            positions: vec![],
-            colors: vec![],
-            indexes: vec![],
+            triangles: Triangles::new(vec![], vec![]),
             paths: FnvHashMap::default(),
-            model: RefCell::new(None),
         }
     }
 
@@ -357,11 +351,8 @@ impl GadgetRenderInfo {
     /// Updates the rendering information so
     /// that it is correct when rendering
     fn update(&mut self, gadget: &Gadget) {
-        self.positions.clear();
-        self.colors.clear();
-        self.indexes.clear();
+        self.triangles.clear();
         self.paths.clear();
-        *self.model.borrow_mut() = None;
 
         // Surrounding rectangle
         let rect = Rectangle::new(
@@ -452,49 +443,16 @@ impl GadgetRenderInfo {
             }
         }
     }
-
-    pub fn colors(&self) -> &Vec<f32> {
-        &self.colors
-    }
-
-    pub fn model(&self, gl: &Rc<Context>) -> Ref<Model> {
-        {
-            let mut model = self.model.borrow_mut();
-
-            if model.is_none() {
-                *model = Some(Model::new(gl, &self.positions, &self.colors, &self.indexes));
-            }
-        }
-        Ref::map(self.model.borrow(), |m| m.as_ref().unwrap())
-    }
 }
 
 impl Clone for GadgetRenderInfo {
     fn clone(&self) -> Self {
         Self {
-            positions: self.positions.clone(),
-            colors: self.colors.clone(),
-            indexes: self.indexes.clone(),
+            triangles: self.triangles.clone(),
             paths: self.paths.clone(),
-            model: RefCell::new(None),
         }
     }
 }
-
-impl Shape for GadgetRenderInfo {
-    fn num_vertices(&self) -> usize {
-        self.positions().len() / 3
-    }
-
-    fn positions(&self) -> Vec<f32> {
-        self.positions.clone()
-    }
-
-    fn indexes(&self) -> Vec<u32> {
-        self.indexes.clone()
-    }
-}
-
 /// Walks around in a maze of gadgets
 pub struct Agent {
     /// Double the position, because then it's integers
@@ -610,20 +568,6 @@ impl Agent {
                 .extend(1.0),
         );
         self.model.prepare_render().render(transform, camera);
-    }
-
-    /// Returns the model that an agent uses
-    pub fn new_shared_model(gl: &Rc<Context>) -> Model {
-        let positions: Vec<f32> = vec![
-            0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15, 0.0,
-        ];
-        let colors: Vec<f32> = vec![
-            0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0,
-            0.8, 0.0, 1.0,
-        ];
-        let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
-
-        Model::new(gl, &positions, &colors, &indexes)
     }
 }
 
