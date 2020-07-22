@@ -25,7 +25,7 @@ use conrod_core::{Ui, UiBuilder};
 use golem::depth::{DepthTestFunction, DepthTestMode};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
 use golem::blend::{BlendInput, BlendMode, BlendOperation};
-
+use golem::ShaderProgram;
 
 use golem::{Context};
 
@@ -36,7 +36,7 @@ use wasm_bindgen::JsCast;
 
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
-use winit::dpi::{LogicalPosition, LogicalSize};
+use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::MouseScrollDelta;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -71,6 +71,8 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub struct App {
     gl: Rc<Context>,
+    shaders: Vec<Rc<ShaderProgram>>,
+    models: Vec<Rc<Model>>,
     camera: Camera,
     center: Vec2,
     height: f64,
@@ -137,6 +139,8 @@ impl App {
 
         Self {
             gl: Rc::clone(gl),
+            shaders: vec![],
+            models: vec![],
             camera,
             center: vec2(0.0, 0.0),
             height: 10.0,
@@ -177,7 +181,7 @@ impl App {
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
         if let Some(gadget) = &self.gadget_tile {
-            gadget.renderer().model(&self.gl).render_position(
+            gadget.renderer().model(&self.gl).prepare_render().render_position(
                 vec3(
                     self.gadget_tile_xy.x as f64,
                     self.gadget_tile_xy.y as f64,
@@ -317,6 +321,7 @@ pub fn main_js() -> Result<(), JsValue> {
             let style = canvas.style();
             style.remove_property("width").unwrap();
             style.remove_property("height").unwrap();
+            style.set_property("cursor", "auto");
 
             web_sys::window().unwrap().document().unwrap().body().unwrap().append_child(&canvas).unwrap();
 
@@ -360,10 +365,10 @@ pub fn main_js() -> Result<(), JsValue> {
         original_height as u32,
     );
 
-    event_loop.run(move |event, _, ctrl| {
-        let width = crate::window().inner_width().unwrap().as_f64().unwrap();
-        let height = crate::window().inner_height().unwrap().as_f64().unwrap();
+    let mut width = original_width;
+    let mut height = original_height;
 
+    event_loop.run(move |event, _, ctrl| {
         *ctrl = ControlFlow::Poll;
 
         match event {
@@ -373,6 +378,9 @@ pub fn main_js() -> Result<(), JsValue> {
             } if window_id == window.id() => *ctrl = ControlFlow::Exit,
 
             Event::MainEventsCleared => {
+                width = crate::window().inner_width().unwrap().as_f64().unwrap();
+                height = crate::window().inner_height().unwrap().as_f64().unwrap();
+
                 ui.win_w = width;
                 ui.win_h = height;
 
@@ -386,7 +394,8 @@ pub fn main_js() -> Result<(), JsValue> {
             event => {
                 app.handle_input(&event);
 
-                if let Some(event) = conrod_winit::v021_convert_event!(event, &window) {
+                if let Some(event) = conrod_winit::v021_convert_event_wh!(event,
+                    PhysicalSize::new(width, height), window.scale_factor()) {
                     ui.handle_event(event);
                 }
 

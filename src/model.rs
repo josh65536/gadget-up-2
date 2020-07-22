@@ -67,10 +67,17 @@ impl Model {
         }
     }
 
-    pub fn render(&self, transform: Mat4, camera: &Camera) {
+    pub fn prepare_render(&self) -> RenderingModel {
+        self.program.bind_if_not_bound();
+
+        self.program.prepare_draw(&self.vertices, &self.indexes).unwrap();
+
+        RenderingModel(self)
+    }
+
+    fn render(&self, transform: Mat4, camera: &Camera) {
         let transform: Mat4 = camera.get_projection() * camera.get_view() * transform;
 
-        self.program.bind();
         self.program
             .set_uniform(
                 "transform",
@@ -80,14 +87,22 @@ impl Model {
 
         unsafe {
             self.program
-                .draw(
-                    &self.vertices,
-                    &self.indexes,
+                .draw_prepared(
                     0..self.num_indexes,
                     GeometryMode::Triangles,
                 )
-                .unwrap();
         }
+    }
+}
+
+/// An RAII guard for a model that has been prepared to render.
+/// If render is called multiple times while holding the same
+/// guard, unnecessary preparation calls will not happen.
+pub struct RenderingModel<'a>(&'a Model);
+
+impl<'a> RenderingModel<'a> {
+    pub fn render(&self, transform: Mat4, camera: &Camera) {
+        self.0.render(transform, camera)
     }
 
     pub fn render_position(&self, position: Vec3, camera: &Camera) {

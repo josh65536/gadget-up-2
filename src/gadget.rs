@@ -609,7 +609,7 @@ impl Agent {
                 .extend(-0.1)
                 .extend(1.0),
         );
-        self.model.render(transform, camera);
+        self.model.prepare_render().render(transform, camera);
     }
 
     /// Returns the model that an agent uses
