@@ -5,7 +5,7 @@ mod shader;
 mod ui;
 
 pub use camera::Camera;
-pub use gadget::{GadgetRenderer, GridItemRenderer, GadgetRenderInfo};
+pub use gadget::{GadgetRenderInfo, GadgetRenderer, GridItemRenderer};
 pub use model::{Model, Triangles, TrianglesEx, Vertex, VertexEx};
 pub use model::{ModelType, TrianglesType, MODELS, TRIANGLESES};
 pub use shader::{ShaderType, SHADERS};

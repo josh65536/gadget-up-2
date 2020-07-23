@@ -3,8 +3,8 @@ use conrod_core::widget;
 use conrod_core::Widget;
 use conrod_derive::WidgetCommon;
 
-use crate::log;
 use crate::gadget::Gadget;
+use crate::log;
 use crate::math::Vec2;
 use crate::render::{TrianglesEx, UiRenderer};
 use crate::shape::Shape;

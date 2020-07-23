@@ -10,7 +10,7 @@ use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 
 use super::{Camera, TrianglesEx, TrianglesType, VertexEx, TRIANGLESES};
-use super::{SHADERS, ShaderType};
+use super::{ShaderType, SHADERS};
 use crate::log;
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;

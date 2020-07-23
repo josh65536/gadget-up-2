@@ -1,21 +1,21 @@
 use super::{Camera, ShaderType, TrianglesEx, TrianglesType, SHADERS, TRIANGLESES};
-use super::{MODELS, ModelType, Triangles, Vertex, Model};
-use crate::gadget::{Gadget, PP, Agent};
+use super::{Model, ModelType, Triangles, Vertex, MODELS};
+use crate::gadget::{Agent, Gadget, PP};
 use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::shape::{Rectangle, Shape, Path, Circle};
-use crate::math::{Vec2, Vector2Ex, Mat4};
+use crate::math::{Mat4, Vec2, Vector2Ex};
+use crate::shape::{Circle, Path, Rectangle, Shape};
 
 use cgmath::{vec2, vec3, vec4};
+use fnv::FnvHashMap;
 use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use itertools::izip;
 use ref_thread_local::RefThreadLocal;
-use std::rc::Rc;
 use std::cell::{Ref, RefCell};
-use fnv::FnvHashMap;
+use std::rc::Rc;
 
 pub struct GadgetRenderInfo {
     triangles: Triangles,
@@ -40,7 +40,11 @@ impl GadgetRenderInfo {
             let mut model = self.model.borrow_mut();
 
             if model.is_none() {
-                *model = Some(Model::new(gl, &SHADERS.borrow()[ShaderType::Basic], &self.triangles));
+                *model = Some(Model::new(
+                    gl,
+                    &SHADERS.borrow()[ShaderType::Basic],
+                    &self.triangles,
+                ));
             }
         }
         Ref::map(self.model.borrow(), |m| m.as_ref().unwrap())
@@ -60,10 +64,7 @@ impl GadgetRenderInfo {
 
     /// Gets the path a robot takes to go from p0 to p1
     fn port_path(ports: PP, port_positions: &Vec<Vec2>) -> Path {
-        let positions: [Vec2; 2] = [
-            port_positions[ports.0.id()],
-            port_positions[ports.1.id()],
-        ];
+        let positions: [Vec2; 2] = [port_positions[ports.0.id()], port_positions[ports.1.id()]];
         let mut bezier = [vec2(0.0, 0.0), vec2(0.0, 0.0)];
 
         let offset = 0.25;
@@ -320,6 +321,8 @@ impl Agent {
             vec4(0.0, 0.0, 1.0, 0.0),
             (self.position()).extend(-0.1).extend(1.0),
         );
-        MODELS.borrow()[ModelType::Agent].prepare_render().render(transform, camera);
+        MODELS.borrow()[ModelType::Agent]
+            .prepare_render()
+            .render(transform, camera);
     }
 }

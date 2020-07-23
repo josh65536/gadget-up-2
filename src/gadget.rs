@@ -8,8 +8,8 @@ use std::rc::Rc;
 
 use crate::grid::{Grid, WH, XY};
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
-use crate::render::{TRIANGLESES, MODELS, ModelType, SHADERS, GadgetRenderInfo};
 use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
+use crate::render::{GadgetRenderInfo, ModelType, MODELS, SHADERS, TRIANGLESES};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -40,6 +40,20 @@ pub type PP = (Port, Port);
 
 /// Type for ((state, port), (state, port)) traversals
 pub type SPSP = (SP, SP);
+
+/// Helper macro for defining (port, port) combinations.
+macro_rules! sp_multi {
+    ($(($s:expr, $p:expr)),* $(,)?) => {
+        [$(($crate::gadget::State($s), $crate::gadget::Port($p))),*].iter().copied()
+    };
+}
+
+/// Helper macro for defining (state, port) traversals.
+macro_rules! pp_multi {
+    ($(($p0:expr, $p1:expr)),* $(,)?) => {
+        [$(($crate::gadget::Port($p0), $crate::gadget::Port($p1))),*].iter().copied()
+    };
+}
 
 /// Helper macro for defining traversals.
 /// Returns an iterator of ((state, port), (state, port)) traversals.
@@ -130,7 +144,7 @@ impl Gadget {
     /// and a port map.
     ///
     /// Ports are located at midpoints of unit segments along the perimeter,
-    /// starting from the bottom left and going counterclockwise. 
+    /// starting from the bottom left and going counterclockwise.
     /// The port map maps each port to its position index along the perimeter.
     pub fn new(def: &Rc<GadgetDef>, size: WH, port_map: Vec<usize>, state: State) -> Self {
         let res = Self {
@@ -153,7 +167,10 @@ impl Gadget {
     }
 
     pub fn port(&self, index: usize) -> Option<Port> {
-        self.port_map.iter().position(|n| *n == index).map(|n| Port(n))
+        self.port_map
+            .iter()
+            .position(|n| *n == index)
+            .map(|n| Port(n))
     }
 
     pub fn state(&self) -> State {
@@ -292,7 +309,6 @@ impl Clone for Gadget {
         }
     }
 }
-
 
 /// Walks around in a maze of gadgets
 pub struct Agent {
@@ -437,8 +453,77 @@ mod test {
         assert_eq!(2, def.num_ports());
         assert_eq!(2, def.num_states());
 
-        let expected = spsp_multi!(((0, 0), (1, 1)), ((1, 1), (0, 0))).collect::<FnvHashSet<_>>();
+        let expected = spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))].collect::<FnvHashSet<_>>();
         let result = def.traversals().copied().collect::<FnvHashSet<_>>();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_targets_from_state_port_empty() {
+        let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
+
+        let expected = sp_multi![].collect::<FnvHashSet<_>>();
+        let result = def.targets_from_state_port((State(0), Port(1))).collect::<FnvHashSet<_>>();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_targets_from_state_port_one() {
+        let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
+
+        let expected = sp_multi![(0, 0)].collect::<FnvHashSet<_>>();
+        let result = def.targets_from_state_port((State(1), Port(1))).collect::<FnvHashSet<_>>();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_targets_from_state_port_multiple() {
+        let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((0, 0), (0, 1))]);
+
+        let expected = sp_multi![(1, 1), (0, 1)].collect::<FnvHashSet<_>>();
+        let result = def.targets_from_state_port((State(0), Port(0))).collect::<FnvHashSet<_>>();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_port_traversals_in_state_empty() {
+        let def = GadgetDef::from_traversals(4, 4,
+            spsp_multi![
+                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
+            ]
+        );
+
+        let expected = pp_multi![].collect::<FnvHashSet<_>>();
+        let result = def.port_traversals_in_state(State(3));
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn test_port_traversals_in_state_one() {
+        let def = GadgetDef::from_traversals(4, 4,
+            spsp_multi![
+                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
+            ]
+        );
+
+        let expected = pp_multi![(2, 3)].collect::<FnvHashSet<_>>();
+        let result = def.port_traversals_in_state(State(1));
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn test_port_traversals_in_state_multiple() {
+        let def = GadgetDef::from_traversals(4, 4,
+            spsp_multi![
+                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
+            ]
+        );
+
+        let expected = pp_multi![(0, 1), (2, 3)].collect::<FnvHashSet<_>>();
+        let result = def.port_traversals_in_state(State(0));
+        assert_eq!(result, expected)
     }
 }

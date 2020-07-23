@@ -69,7 +69,11 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let way4 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
-    def = Rc::new(GadgetDef::from_traversals(1, 2, spsp_multi![((0, 0), (0, 1))]));
+    def = Rc::new(GadgetDef::from_traversals(
+        1,
+        2,
+        spsp_multi![((0, 0), (0, 1))],
+    ));
 
     let diode = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
@@ -81,7 +85,11 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let toggle = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
-    def = Rc::new(GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1))]));
+    def = Rc::new(GadgetDef::from_traversals(
+        2,
+        2,
+        spsp_multi![((0, 0), (1, 1))],
+    ));
 
     let dicrumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
@@ -133,8 +141,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1)), ((1, 2), (0, 3))],
     ));
 
-    let mismatched_dicrumbler =
-        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let mismatched_dicrumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -147,8 +154,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let mismatched_crumbler =
-        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let mismatched_crumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -214,9 +220,17 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let tripwire_toggle = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
-    def = Rc::new(GadgetDef::from_traversals(2, 6, spsp_multi![
-        ((0, 0), (1, 1)), ((0, 2), (0, 3)), ((1, 0), (1, 1)), ((1, 2), (0, 3)), ((1, 4), (1, 5))
-    ]));
+    def = Rc::new(GadgetDef::from_traversals(
+        2,
+        6,
+        spsp_multi![
+            ((0, 0), (1, 1)),
+            ((0, 2), (0, 3)),
+            ((1, 0), (1, 1)),
+            ((1, 2), (0, 3)),
+            ((1, 4), (1, 5))
+        ],
+    ));
 
     let door = Gadget::new(&def, (2, 1), vec![4, 5, 1, 2, 0, 3], State(0));
 

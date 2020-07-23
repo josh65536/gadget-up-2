@@ -1,16 +1,16 @@
 use cgmath::vec2;
+use conrod_core::color;
 use conrod_core::position::{Align, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
-use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix, List};
 use conrod_core::widget::Canvas;
+use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, List, Matrix};
 use conrod_core::widget_ids;
 use conrod_core::Ui;
-use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget, Borderable, Theme};
-use conrod_core::color;
+use conrod_core::{Borderable, Color, Colorable, Positionable, Sizeable, Theme, Widget};
 use ref_thread_local::RefThreadLocal;
 
-use crate::log;
 use crate::gadget::Agent;
+use crate::log;
 use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MODELS};
 use crate::render::{SHADERS, TRIANGLESES};
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
@@ -60,13 +60,26 @@ impl App {
 
     pub fn update_ui(&mut self, ui: &mut Ui) {
         for id in [
-            self.ids.canvas, self.ids.header, self.ids.body, self.ids.left_sidebar,
-            self.ids.rect, self.ids.contraption_screen, self.ids.menu, self.ids.menu_list,
-            self.ids.gadget_select, self.ids.agent
-        ].iter() {
-            log!("Id: {:?}, Capturing: {}", id, ui.widget_input(*id).mouse().is_some());
+            self.ids.canvas,
+            self.ids.header,
+            self.ids.body,
+            self.ids.left_sidebar,
+            self.ids.rect,
+            self.ids.contraption_screen,
+            self.ids.menu,
+            self.ids.menu_list,
+            self.ids.gadget_select,
+            self.ids.agent,
+        ]
+        .iter()
+        {
+            log!(
+                "Id: {:?}, Capturing: {}",
+                id,
+                ui.widget_input(*id).mouse().is_some()
+            );
         }
-        
+
         let mut ui = ui.set_widgets();
 
         // Contraption screen
@@ -118,16 +131,17 @@ impl App {
             }
         }
 
-        let new_canvas = || {
-            Canvas::new().graphics_for(self.ids.contraption_screen)
-        };
+        let new_canvas = || Canvas::new().graphics_for(self.ids.contraption_screen);
 
-        new_canvas().flow_down(&[
-            (self.ids.header, new_canvas().length(40.0)),
-            (self.ids.body, new_canvas().flow_right(&[
-                (self.ids.left_sidebar, new_canvas().length(260.0))
-            ]))
-        ]).set(self.ids.canvas, &mut ui);
+        new_canvas()
+            .flow_down(&[
+                (self.ids.header, new_canvas().length(40.0)),
+                (
+                    self.ids.body,
+                    new_canvas().flow_right(&[(self.ids.left_sidebar, new_canvas().length(260.0))]),
+                ),
+            ])
+            .set(self.ids.canvas, &mut ui);
 
         // Menu
         BorderedRectangle::new([1.0, 1.0])
@@ -144,13 +158,13 @@ impl App {
             .middle_of(self.ids.menu)
             .wh_of(self.ids.menu)
             .set(self.ids.menu_list, &mut ui);
-            
+
         for _ in items.next(&ui).unwrap().set(
             Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep))
-                    .padding(3.0)
-                    .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
-                    .h_of(self.ids.menu_list),
-            &mut ui
+                .padding(3.0)
+                .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
+                .h_of(self.ids.menu_list),
+            &mut ui,
         ) {
             self.set_mode(Mode::TilePaint);
         }
@@ -164,16 +178,13 @@ impl App {
                 0.3,
                 0.3,
             ))
-                .padding(3.0)
-                .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
-                .h_of(self.ids.menu_list),
-            &mut ui
+            .padding(3.0)
+            .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
+            .h_of(self.ids.menu_list),
+            &mut ui,
         ) {
             self.set_mode(Mode::AgentPlace);
-            self.agent = Some(Agent::new(
-                vec2(0.5, 0.0),
-                vec2(0, 1),
-            ));
+            self.agent = Some(Agent::new(vec2(0.5, 0.0), vec2(0, 1)));
         }
 
         // Gadget selector

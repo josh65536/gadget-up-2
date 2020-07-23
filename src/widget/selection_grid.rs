@@ -1,6 +1,6 @@
 use conrod_core::widget::{self, Widget};
 use conrod_core::{builder_method, builder_methods, widget_ids};
-use conrod_core::{Color, Colorable, Positionable, Sizeable, Borderable};
+use conrod_core::{Borderable, Color, Colorable, Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use super::button::Button;

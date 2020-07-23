@@ -174,14 +174,18 @@ impl App {
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
         if let Some(gadget) = &self.gadget_tile {
-            gadget.renderer().model(&self.gl).prepare_render().render_position(
-                vec3(
-                    self.gadget_tile_xy.x as f64,
-                    self.gadget_tile_xy.y as f64,
-                    -0.25,
-                ),
-                &self.camera,
-            );
+            gadget
+                .renderer()
+                .model(&self.gl)
+                .prepare_render()
+                .render_position(
+                    vec3(
+                        self.gadget_tile_xy.x as f64,
+                        self.gadget_tile_xy.y as f64,
+                        -0.25,
+                    ),
+                    &self.camera,
+                );
         }
 
         if let Some(agent) = &self.agent {
@@ -223,11 +227,7 @@ impl App {
                     VirtualKeyCode::R | VirtualKeyCode::T => {
                         if let ElementState::Pressed = state {
                             if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.rotate(if *keycode == VirtualKeyCode::R {
-                                    1
-                                } else {
-                                    -1
-                                });
+                                gadget.rotate(if *keycode == VirtualKeyCode::R { 1 } else { -1 });
                             }
 
                             if self.mode == Mode::AgentPlace {
@@ -357,7 +357,9 @@ pub fn main_js() -> Result<(), JsValue> {
 
     let mut frame = 0;
 
-    let mut ui = UiBuilder::new([original_width, original_height]).theme(ui::theme()).build();
+    let mut ui = UiBuilder::new([original_width, original_height])
+        .theme(ui::theme())
+        .build();
     let mut app = App::new(gl, &mut ui, original_width as u32, original_height as u32);
 
     let mut width = original_width;
