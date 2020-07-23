@@ -213,6 +213,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let tripwire_toggle = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
 
+    def = Rc::new(GadgetDef::from_traversals(2, 6, vec![
+        ((0, 0), (1, 1)), ((0, 2), (0, 3)), ((1, 0), (1, 1)), ((1, 2), (0, 3)), ((1, 4), (1, 5))
+    ]));
+
+    let door = Gadget::new(&def, (2, 1), vec![Some(4), Some(2), Some(3), Some(5), Some(0), Some(1)], 0);
+
     vec![
         nope,
         straight,
@@ -235,5 +241,6 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         toggle_lock,
         tripwire_lock,
         tripwire_toggle,
+        door,
     ]
 }

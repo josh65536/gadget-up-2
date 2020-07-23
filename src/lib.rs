@@ -223,7 +223,7 @@ impl App {
                     VirtualKeyCode::R | VirtualKeyCode::T => {
                         if let ElementState::Pressed = state {
                             if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.rotate_ports(if *keycode == VirtualKeyCode::R {
+                                gadget.rotate(if *keycode == VirtualKeyCode::R {
                                     1
                                 } else {
                                     -1

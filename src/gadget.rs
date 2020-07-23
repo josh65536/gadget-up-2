@@ -219,6 +219,18 @@ impl Gadget {
             .collect();
     }
 
+    /// Rotates the gadget by some number of 90-degree turns.
+    /// A positive number means counterclockwise,
+    /// a negative number means clockwise.
+    pub fn rotate(&mut self, num_turns: i32) {
+        self.dirty.set(true);
+
+        for _ in (0..num_turns.rem_euclid(4)) {
+            self.rotate_ports(self.size.1 as i32);
+            std::mem::swap(&mut self.size.0, &mut self.size.1);
+        }
+    }
+
     /// Temporary function to flip ports; in a hurry
     pub fn flip_ports(&mut self) {
         self.dirty.set(true);
