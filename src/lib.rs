@@ -76,9 +76,7 @@ pub struct App {
     /// The gadget currently being used to paint tiles
     gadget_tile: Option<Gadget>,
     gadget_tile_xy: grid::XY,
-    gadget_tile_model: Option<Model>,
     agent: Option<Agent>,
-    agent_position: Vec2,
     gadget_select_rep: Gadget,
     mode: Mode,
     ids: WidgetIds,
@@ -147,9 +145,7 @@ impl App {
             gadget_selection: None,
             gadget_tile: None,
             gadget_tile_xy: vec2(0, 0),
-            gadget_tile_model: None,
             agent: None,
-            agent_position: vec2(0.0, 0.0),
             gadget_select_rep,
             mode: Mode::None,
             ids: widget_ids,
@@ -177,8 +173,8 @@ impl App {
 
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
-        if let Some(model) = &self.gadget_tile_model {
-            model.prepare_render().render_position(
+        if let Some(gadget) = &self.gadget_tile {
+            gadget.renderer().model(&self.gl).prepare_render().render_position(
                 vec3(
                     self.gadget_tile_xy.x as f64,
                     self.gadget_tile_xy.y as f64,
@@ -236,7 +232,7 @@ impl App {
 
                             if self.mode == Mode::AgentPlace {
                                 if let Some(agent) = &mut self.agent {
-                                    agent.rotate(1);
+                                    agent.flip();
                                 }
                             }
                         }
@@ -361,7 +357,7 @@ pub fn main_js() -> Result<(), JsValue> {
 
     let mut frame = 0;
 
-    let mut ui = UiBuilder::new([original_width, original_height]).build();
+    let mut ui = UiBuilder::new([original_width, original_height]).theme(ui::theme()).build();
     let mut app = App::new(gl, &mut ui, original_width as u32, original_height as u32);
 
     let mut width = original_width;

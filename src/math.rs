@@ -18,6 +18,9 @@ pub trait Vector2Ex<S: BaseNum + Neg> {
     /// Rotates the vector 90 degrees counterclockwise
     fn right_ccw(self) -> Self;
 
+    /// Rotates the vector 90 degrees clockwise
+    fn right_cw(self) -> Self;
+
     /// Dot product; not restricted to floats
     fn dot_ex(self, other: Self) -> S;
 }
@@ -28,6 +31,10 @@ where
 {
     fn right_ccw(self) -> Self {
         Vector2::new(-self.y, self.x)
+    }
+
+    fn right_cw(self) -> Self {
+        -self.right_ccw()
     }
 
     fn dot_ex(self, other: Self) -> S {

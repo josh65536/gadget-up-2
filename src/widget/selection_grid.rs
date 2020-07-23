@@ -1,6 +1,6 @@
 use conrod_core::widget::{self, Widget};
-use conrod_core::{builder_method, widget_ids};
-use conrod_core::{Color, Colorable, Positionable, Sizeable};
+use conrod_core::{builder_method, builder_methods, widget_ids};
+use conrod_core::{Color, Colorable, Positionable, Sizeable, Borderable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use super::button::Button;
@@ -31,6 +31,10 @@ pub struct SelectionGrid<'a> {
 pub struct Style {
     #[conrod(default = "theme.shape_color")]
     pub color: Option<Color>,
+    #[conrod(default = "theme.border_width")]
+    pub border: Option<f64>,
+    #[conrod(default = "theme.border_color")]
+    pub border_color: Option<Color>,
     /// Padding on the outside
     #[conrod(default = "0.0")]
     pub outer_padding: Option<f64>,
@@ -62,6 +66,13 @@ impl<'a> SelectionGrid<'a> {
 
 impl<'a> Colorable for SelectionGrid<'a> {
     builder_method! (color { style.color = Some(Color) });
+}
+
+impl<'a> Borderable for SelectionGrid<'a> {
+    builder_methods! {
+        border { style.border = Some(f64) }
+        border_color { style.border_color = Some(Color) }
+    }
 }
 
 impl<'a> Widget for SelectionGrid<'a> {
@@ -98,6 +109,8 @@ impl<'a> Widget for SelectionGrid<'a> {
         } = self;
 
         let color = style.color(&ui.theme);
+        let border = style.border(&ui.theme);
+        let border_color = style.border_color(&ui.theme);
         let outer_padding = style.outer_padding(&ui.theme);
 
         let pad_rect = rect.pad(-outer_padding);
@@ -106,6 +119,8 @@ impl<'a> Widget for SelectionGrid<'a> {
             .middle_of(id)
             .graphics_for(id)
             .color(color)
+            .border(border)
+            .border_color(border_color)
             .set(state.rect, ui);
 
         let h_scale = (size_h as f64 / size_w as f64) / (rect.h() / rect.w());

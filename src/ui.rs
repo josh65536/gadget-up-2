@@ -1,12 +1,15 @@
 use cgmath::vec2;
 use conrod_core::position::{Align, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
-use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix};
+use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, Matrix, List};
+use conrod_core::widget::Canvas;
 use conrod_core::widget_ids;
 use conrod_core::Ui;
-use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget};
+use conrod_core::{Color, Colorable, Positionable, Sizeable, Widget, Borderable, Theme};
+use conrod_core::color;
 use ref_thread_local::RefThreadLocal;
 
+use crate::log;
 use crate::gadget::Agent;
 use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MODELS};
 use crate::render::{SHADERS, TRIANGLESES};
@@ -15,7 +18,17 @@ use crate::App;
 
 widget_ids! {
     pub struct WidgetIds {
-        rect, contraption_screen, menu, gadget_select, agent,
+        rect, contraption_screen, menu, menu_list, gadget_select, agent,
+        canvas, header, body, left_sidebar,
+    }
+}
+
+pub fn theme() -> Theme {
+    Theme {
+        background_color: color::TRANSPARENT,
+        shape_color: color::TRANSPARENT,
+        border_color: color::TRANSPARENT,
+        ..Theme::default()
     }
 }
 
@@ -29,15 +42,12 @@ pub enum Mode {
 }
 
 impl App {
-    const MENU_HEIGHT: f64 = 40.0;
-
     pub fn set_mode(&mut self, mode: Mode) {
         if mode != self.mode {
             // clear some fields
             if mode != Mode::TilePaint {
                 self.gadget_selection = None;
                 self.gadget_tile = None;
-                self.gadget_tile_model = None;
             }
 
             if mode != Mode::AgentPlace && mode != Mode::Play {
@@ -49,11 +59,22 @@ impl App {
     }
 
     pub fn update_ui(&mut self, ui: &mut Ui) {
+        for id in [
+            self.ids.canvas, self.ids.header, self.ids.body, self.ids.left_sidebar,
+            self.ids.rect, self.ids.contraption_screen, self.ids.menu, self.ids.menu_list,
+            self.ids.gadget_select, self.ids.agent
+        ].iter() {
+            log!("Id: {:?}, Capturing: {}", id, ui.widget_input(*id).mouse().is_some());
+        }
+        
         let mut ui = ui.set_widgets();
 
+        // Contraption screen
         for event in ContraptionScreen::new(self.mode, &self.camera)
-            .x_y(0.0, 0.0)
+            .middle_of(ui.window)
             .wh_of(ui.window)
+            //.x_y(0.0, 0.0)
+            //.wh_of(ui.window)
             .set(self.ids.contraption_screen, &mut ui)
         {
             match event {
@@ -97,48 +118,45 @@ impl App {
             }
         }
 
+        let new_canvas = || {
+            Canvas::new().graphics_for(self.ids.contraption_screen)
+        };
+
+        new_canvas().flow_down(&[
+            (self.ids.header, new_canvas().length(40.0)),
+            (self.ids.body, new_canvas().flow_right(&[
+                (self.ids.left_sidebar, new_canvas().length(260.0))
+            ]))
+        ]).set(self.ids.canvas, &mut ui);
+
         // Menu
         BorderedRectangle::new([1.0, 1.0])
             .with_style(bordered_rectangle::Style {
                 color: Some(Color::Rgba(0.9, 0.9, 0.9, 1.0)),
                 border: None,
-                border_color: None,
+                border_color: Some(color::BLACK),
             })
-            .w_of(ui.window)
-            .h(App::MENU_HEIGHT)
-            .x(0.0)
-            .y_position_relative_to(ui.window, Relative::Align(Align::End))
+            .middle_of(self.ids.header)
+            .wh_of(self.ids.header)
             .set(self.ids.menu, &mut ui);
 
-        //while let Some(element) = Matrix::new(2, 1)
-        //    .x(3.0)
-        //    .y(0.0)
-        //    .w((App::MENU_HEIGHT - 6.0) * 2.0)
-        //    .h(34.0)
-        //    .set(self.ids.menu_mtx, &mut ui).next(&mut ui)
-        //{
-        {
-            for _ in Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep))
-                .x_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
-                .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
-                .w(App::MENU_HEIGHT - 6.0)
-                .h(34.0)
-                .set(self.ids.gadget_select, &mut ui)
-            {
-                self.set_mode(Mode::TilePaint);
-            }
+        let (mut items, _) = List::flow_right(2)
+            .middle_of(self.ids.menu)
+            .wh_of(self.ids.menu)
+            .set(self.ids.menu_list, &mut ui);
+            
+        for _ in items.next(&ui).unwrap().set(
+            Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep))
+                    .padding(3.0)
+                    .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
+                    .h_of(self.ids.menu_list),
+            &mut ui
+        ) {
+            self.set_mode(Mode::TilePaint);
+        }
 
-            let positions: Vec<f32> = vec![
-                0.15, -0.15, 0.0, 0.15, 0.0, 0.0, 0.0, 0.15, 0.0, -0.15, 0.0, 0.0, -0.15, -0.15,
-                0.0,
-            ];
-            let colors: Vec<f32> = vec![
-                0.0, 0.8, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0, 0.0, 0.4, 0.0, 1.0, 0.0, 0.6, 0.0, 1.0,
-                0.0, 0.8, 0.0, 1.0,
-            ];
-            let indexes: Vec<u32> = vec![0, 1, 2, 0, 2, 4, 2, 3, 4];
-
-            for _ in Button::triangles(Triangles3d::new(
+        for _ in items.next(&ui).unwrap().set(
+            Button::triangles(Triangles3d::new(
                 (*TRIANGLESES.borrow()[TrianglesType::Agent])
                     .clone()
                     .with_default_extra(),
@@ -146,34 +164,26 @@ impl App {
                 0.3,
                 0.3,
             ))
-            .x_position_relative_to(
-                self.ids.menu,
-                Relative::Place(Place::Start(Some(App::MENU_HEIGHT))),
-            )
-            .y_position_relative_to(self.ids.menu, Relative::Place(Place::Start(Some(3.0))))
-            .w(App::MENU_HEIGHT - 6.0)
-            .h(34.0)
-            .set(self.ids.agent, &mut ui)
-            {
-                self.set_mode(Mode::AgentPlace);
-                self.agent = Some(Agent::new(
-                    self.agent_position,
-                    vec2(0, 1),
-                    &MODELS.borrow()[ModelType::Agent],
-                ));
-            }
+                .padding(3.0)
+                .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
+                .h_of(self.ids.menu_list),
+            &mut ui
+        ) {
+            self.set_mode(Mode::AgentPlace);
+            self.agent = Some(Agent::new(
+                vec2(0.5, 0.0),
+                vec2(0, 1),
+            ));
         }
-        //}
 
         // Gadget selector
         if self.mode != Mode::Play {
             let selection = SelectionGrid::new(4, &self.gadget_select, self.gadget_selection)
                 .color(Color::Rgba(0.8, 0.9, 0.8, 1.0))
+                .border_color(color::BLACK)
                 .outer_padding(5.0)
-                .x_position_relative_to(ui.window, Relative::Place(Place::Start(Some(10.0))))
-                .y_position_relative_to(ui.window, Relative::Place(Place::Start(Some(10.0))))
-                .w(250.0)
-                .padded_h_of(ui.window, App::MENU_HEIGHT / 2.0 + 10.0)
+                .middle_of(self.ids.left_sidebar)
+                .padded_wh_of(self.ids.left_sidebar, 10.0)
                 .set(self.ids.rect, &mut ui);
 
             if let Some(selection) = selection {
@@ -181,11 +191,6 @@ impl App {
                 self.gadget_selection = Some(selection);
 
                 let gadget = self.gadget_select[selection].clone();
-                self.gadget_tile_model = Some(Model::new(
-                    &self.gl,
-                    &SHADERS.borrow()[ShaderType::Basic],
-                    gadget.renderer().triangles(),
-                ));
                 self.gadget_tile = Some(gadget);
             }
         }
