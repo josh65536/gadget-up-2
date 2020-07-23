@@ -149,8 +149,8 @@ impl<'a> ContraptionScreen<'a> {
                 if mouse.is_over() {
                     let (_w, _h) = rect.w_h();
 
-                    let x = state.position[0].floor() as i32;
-                    let y = state.position[1].floor() as i32;
+                    let x = state.position[0].floor() as isize;
+                    let y = state.position[1].floor() as isize;
 
                     if state.input.is_left() {
                         let event = Event::TilePaint(vec2(x, y));

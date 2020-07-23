@@ -6,7 +6,7 @@ use std::iter::{FromIterator, IntoIterator};
 use crate::math::Vec2i;
 
 pub type XY = Vec2i;
-pub type WH = (u32, u32);
+pub type WH = (usize, usize);
 
 /// Sparse grid for storing things that do not necessarily take up
 /// a 1x1 slot
@@ -57,10 +57,10 @@ impl<T> Grid<T> {
 
     /// Gets the xy positions that are empty
     pub fn get_empty_in_bounds(&self, min_x: f64, max_x: f64, min_y: f64, max_y: f64) -> Vec<XY> {
-        let min_x = min_x.floor() as i32;
-        let max_x = max_x.ceil() as i32;
-        let min_y = min_y.floor() as i32;
-        let max_y = max_y.ceil() as i32;
+        let min_x = min_x.floor() as isize;
+        let max_x = max_x.ceil() as isize;
+        let min_y = min_y.floor() as isize;
+        let max_y = max_y.ceil() as isize;
 
         iproduct!(min_x..=max_x, min_y..=max_y)
             .map(|(x, y)| vec2(x, y))
@@ -106,15 +106,15 @@ impl<T> Grid<T> {
                         xy.x - min_xy.x
                     } else {
                         // Top edge
-                        (w + h + w) as i32 - (xy.x - min_xy.x) - 1
+                        (w + h + w) as isize - (xy.x - min_xy.x) - 1
                     }
                 } else {
                     if xy.x == min_xy.x {
                         // Left edge
-                        (w + h + w + h) as i32 - (xy.y - min_xy.y) - 1
+                        (w + h + w + h) as isize - (xy.y - min_xy.y) - 1
                     } else {
                         // Right edge
-                        w as i32 + (xy.y - min_xy.y)
+                        w as isize + (xy.y - min_xy.y)
                     }
                 } as usize,
             ))
@@ -129,8 +129,8 @@ impl<T> Grid<T> {
         let (x, y) = (position.x, position.y);
         let (w, h) = size;
 
-        for y in y..(y + h as i32) {
-            for x in x..(x + w as i32) {
+        for y in y..(y + h as isize) {
+            for x in x..(x + w as isize) {
                 self.remove(vec2(x, y));
             }
         }
@@ -140,8 +140,8 @@ impl<T> Grid<T> {
 
         self.items.insert(idx, (t, position, size));
 
-        for y in y..(y + h as i32) {
-            for x in x..(x + w as i32) {
+        for y in y..(y + h as isize) {
+            for x in x..(x + w as isize) {
                 self.grid.insert(vec2(x, y), idx);
             }
         }
@@ -152,8 +152,8 @@ impl<T> Grid<T> {
         if let Some(idx) = self.grid.get(&position) {
             let (_t, xy, (w, h)) = self.items.remove(idx).unwrap();
 
-            for y in xy.y..(xy.y + h as i32) {
-                for x in xy.x..(xy.x + w as i32) {
+            for y in xy.y..(xy.y + h as isize) {
+                for x in xy.x..(xy.x + w as isize) {
                     self.grid.remove(&vec2(x, y));
                 }
             }

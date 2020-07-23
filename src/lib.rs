@@ -38,7 +38,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::web::WindowExtWebSys;
 use winit::window::WindowBuilder;
 
-use gadget::{Agent, Gadget, GadgetDef};
+use gadget::{Agent, Gadget, GadgetDef, State};
 use grid::Grid;
 use math::Vec2;
 use render::{Camera, GadgetRenderer, Model, UiRenderer};
@@ -123,7 +123,7 @@ impl App {
 
         let def = GadgetDef::new(2, 0);
 
-        let gadget_select_rep = Gadget::new(&Rc::new(def), (1, 1), vec![], 0);
+        let gadget_select_rep = Gadget::new(&Rc::new(def), (1, 1), vec![], State(0));
 
         let widget_ids = WidgetIds::new(ui.widget_id_generator());
 

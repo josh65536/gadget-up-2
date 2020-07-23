@@ -5,7 +5,7 @@ use std::ops::Neg;
 pub const TAUf32: f32 = std::f32::consts::PI * 2.0;
 pub const TAUf64: f64 = std::f64::consts::PI * 2.0;
 
-pub type Vec2i = Vector2<i32>;
+pub type Vec2i = Vector2<isize>;
 pub type Vec2 = Vector2<f64>;
 pub type Vec3 = Vector3<f64>;
 pub type Vec4 = Vector4<f64>;

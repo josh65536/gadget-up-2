@@ -60,9 +60,9 @@ impl GadgetRenderInfo {
 
     /// Gets the path a robot takes to go from p0 to p1
     fn port_path(ports: PP, port_positions: &Vec<Vec2>) -> Path {
-        let positions = [
-            port_positions[ports.0 as usize],
-            port_positions[ports.1 as usize],
+        let positions: [Vec2; 2] = [
+            port_positions[ports.0.id()],
+            port_positions[ports.1.id()],
         ];
         let mut bezier = [vec2(0.0, 0.0), vec2(0.0, 0.0)];
 
@@ -170,10 +170,10 @@ impl GadgetRenderInfo {
 
             if directed {
                 let dir = path.end_direction();
-                let end = port_positions[*p1 as usize];
+                let end: Vec2 = port_positions[p1.id()];
 
-                let v0 = end + dir * -0.2 + dir.right_ccw() * -0.1;
-                let v2 = end + dir * -0.2 + dir.right_ccw() * 0.1;
+                let v0: Vec2 = end + dir * -0.2 + dir.right_ccw() * -0.1;
+                let v2: Vec2 = end + dir * -0.2 + dir.right_ccw() * 0.1;
 
                 self.triangles.append(Triangles::new(
                     vec![

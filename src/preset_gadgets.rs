@@ -1,26 +1,27 @@
 use std::rc::Rc;
 
-use crate::gadget::{Gadget, GadgetDef};
+use crate::gadget::{Gadget, GadgetDef, State};
+use crate::spsp_multi;
 
 pub fn preset_gadgets() -> Vec<Gadget> {
     let def = Rc::new(GadgetDef::new(1, 0));
 
-    let nope = Gadget::new(&def, (1, 1), vec![], 0);
+    let nope = Gadget::new(&def, (1, 1), vec![], State(0));
 
     let mut def = Rc::new(GadgetDef::from_traversals(
         1,
         2,
-        vec![((0, 0), (0, 1)), ((0, 1), (0, 0))],
+        spsp_multi![((0, 0), (0, 1)), ((0, 1), (0, 0))],
     ));
 
-    let straight = Gadget::new(&def, (1, 1), vec![Some(0), None, Some(1), None], 0);
+    let straight = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
-    let turn = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), None, None], 0);
+    let turn = Gadget::new(&def, (1, 1), vec![0, 1], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (0, 1)),
             ((0, 1), (0, 0)),
             ((0, 2), (0, 3)),
@@ -28,14 +29,14 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let cross = Gadget::new(&def, (1, 1), vec![Some(0), Some(2), Some(1), Some(3)], 0);
+    let cross = Gadget::new(&def, (1, 1), vec![0, 2, 1, 3], State(0));
 
-    let turn2 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let turn2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
         3,
-        vec![
+        spsp_multi![
             ((0, 0), (0, 1)),
             ((0, 1), (0, 0)),
             ((0, 1), (0, 2)),
@@ -45,12 +46,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let way3 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), None, Some(2)], 0);
+    let way3 = Gadget::new(&def, (1, 1), vec![0, 1, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (0, 1)),
             ((0, 1), (0, 0)),
             ((0, 1), (0, 2)),
@@ -66,44 +67,44 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let way4 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let way4 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
-    def = Rc::new(GadgetDef::from_traversals(1, 2, vec![((0, 0), (0, 1))]));
+    def = Rc::new(GadgetDef::from_traversals(1, 2, spsp_multi![((0, 0), (0, 1))]));
 
-    let diode = Gadget::new(&def, (1, 1), vec![Some(0), None, Some(1), None], 0);
-
-    def = Rc::new(GadgetDef::from_traversals(
-        2,
-        2,
-        vec![((0, 0), (1, 1)), ((1, 1), (0, 0))],
-    ));
-
-    let toggle = Gadget::new(&def, (1, 1), vec![Some(0), None, Some(1), None], 0);
-
-    def = Rc::new(GadgetDef::from_traversals(2, 2, vec![((0, 0), (1, 1))]));
-
-    let dicrumbler = Gadget::new(&def, (1, 1), vec![Some(0), None, Some(1), None], 0);
+    let diode = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         2,
-        vec![((0, 0), (1, 1)), ((0, 1), (1, 0))],
+        spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))],
     ));
 
-    let crumbler = Gadget::new(&def, (1, 1), vec![Some(0), None, Some(1), None], 0);
+    let toggle = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+
+    def = Rc::new(GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1))]));
+
+    let dicrumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+
+    def = Rc::new(GadgetDef::from_traversals(
+        2,
+        2,
+        spsp_multi![((0, 0), (1, 1)), ((0, 1), (1, 0))],
+    ));
+
+    let crumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         3,
-        vec![((0, 0), (1, 0)), ((1, 1), (0, 2))],
+        spsp_multi![((0, 0), (1, 0)), ((1, 1), (0, 2))],
     ));
 
-    let scd = Gadget::new(&def, (1, 1), vec![Some(0), Some(2), None, Some(1)], 0);
+    let scd = Gadget::new(&def, (1, 1), vec![0, 3, 1], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((1, 1), (0, 0)),
             ((0, 2), (1, 3)),
@@ -111,12 +112,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let toggle2 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let toggle2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         3,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((1, 1), (0, 0)),
             ((0, 2), (2, 3)),
@@ -124,21 +125,21 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let lock_toggle_2 = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let lock_toggle_2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![((0, 0), (1, 1)), ((1, 2), (0, 3))],
+        spsp_multi![((0, 0), (1, 1)), ((1, 2), (0, 3))],
     ));
 
     let mismatched_dicrumbler =
-        Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((0, 1), (1, 0)),
             ((1, 2), (0, 3)),
@@ -147,20 +148,20 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     ));
 
     let mismatched_crumbler =
-        Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![((0, 0), (1, 1)), ((0, 2), (1, 3))],
+        spsp_multi![((0, 0), (1, 1)), ((0, 2), (1, 3))],
     ));
 
-    let matched_dicrumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let matched_dicrumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((0, 1), (1, 0)),
             ((0, 2), (1, 3)),
@@ -168,12 +169,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let matched_crumbler = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let matched_crumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((1, 1), (0, 0)),
             ((0, 2), (0, 3)),
@@ -181,12 +182,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let toggle_lock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let toggle_lock = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((1, 1), (0, 0)),
             ((0, 1), (1, 0)),
@@ -196,12 +197,12 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwire_lock = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let tripwire_lock = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
-        vec![
+        spsp_multi![
             ((0, 0), (1, 1)),
             ((1, 1), (0, 0)),
             ((0, 1), (1, 0)),
@@ -211,13 +212,13 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwire_toggle = Gadget::new(&def, (1, 1), vec![Some(0), Some(1), Some(2), Some(3)], 0);
+    let tripwire_toggle = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
 
-    def = Rc::new(GadgetDef::from_traversals(2, 6, vec![
+    def = Rc::new(GadgetDef::from_traversals(2, 6, spsp_multi![
         ((0, 0), (1, 1)), ((0, 2), (0, 3)), ((1, 0), (1, 1)), ((1, 2), (0, 3)), ((1, 4), (1, 5))
     ]));
 
-    let door = Gadget::new(&def, (2, 1), vec![Some(4), Some(2), Some(3), Some(5), Some(0), Some(1)], 0);
+    let door = Gadget::new(&def, (2, 1), vec![4, 5, 1, 2, 0, 3], State(0));
 
     vec![
         nope,
