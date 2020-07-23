@@ -1,26 +1,28 @@
-use cgmath::{Vector3, Vector4, vec3, vec4};
+use cgmath::{vec3, vec4, Vector3, Vector4};
+use fnv::FnvHashMap;
 use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
+use ref_thread_local::{ref_thread_local, RefThreadLocal};
 use std::rc::Rc;
-use fnv::FnvHashMap;
 
-use super::{Camera, ShaderType, ShaderMap};
+use super::{Camera, ShaderType, SHADERS};
 use crate::log;
 use crate::math::{Mat4, Vec3};
+use crate::static_map::StaticMap;
 
 pub type Vertex = VertexEx<[f32; 0]>;
 
 /// Stores the information for a single vertex.
 #[derive(Clone, Debug)]
-pub struct VertexEx<T: AsRef<[f32]>> {
+pub struct VertexEx<T: AsRef<[f32]> + Copy> {
     pub position: Vector3<f32>,
     pub color: Vector4<f32>,
     pub extra: T,
 }
 
-impl<T: AsRef<[f32]>> VertexEx<T> {
+impl<T: AsRef<[f32]> + Copy> VertexEx<T> {
     pub fn new(position: Vector3<f32>, color: Vector4<f32>, extra: T) -> Self {
         Self {
             position,
@@ -47,7 +49,7 @@ impl<T: AsRef<[f32]>> VertexEx<T> {
 
 impl Vertex {
     /// Gets a new vertex with extra attribute items added
-    pub fn with_extra<U: AsRef<[f32]>>(self, extra: U) -> VertexEx<U> {
+    pub fn with_extra<U: AsRef<[f32]> + Copy>(self, extra: U) -> VertexEx<U> {
         VertexEx {
             position: self.position,
             color: self.color,
@@ -56,7 +58,7 @@ impl Vertex {
     }
 
     /// Gets a new vertex with default extra attribute items added
-    pub fn with_default_extra<U: AsRef<[f32]> + Default>(self) -> VertexEx<U> {
+    pub fn with_default_extra<U: AsRef<[f32]> + Copy + Default>(self) -> VertexEx<U> {
         self.with_extra(U::default())
     }
 }
@@ -65,12 +67,12 @@ pub type Triangles = TrianglesEx<[f32; 0]>;
 
 /// Stores the information for multiple triangles.
 #[derive(Clone, Debug, Default)]
-pub struct TrianglesEx<T: AsRef<[f32]>> {
+pub struct TrianglesEx<T: AsRef<[f32]> + Copy> {
     vertices: Vec<VertexEx<T>>,
     indexes: Vec<u32>,
 }
 
-impl<T: AsRef<[f32]>> TrianglesEx<T> {
+impl<T: AsRef<[f32]> + Copy> TrianglesEx<T> {
     pub fn new(vertices: Vec<VertexEx<T>>, indexes: Vec<u32>) -> Self {
         Self { vertices, indexes }
     }
@@ -125,16 +127,20 @@ impl<T: AsRef<[f32]>> TrianglesEx<T> {
 impl Triangles {
     /// Converts this to a triangle list where `extra` has been
     /// added to each vertex's attribute items
-    pub fn with_extra<U: AsRef<[f32]>>(self, extra: U) -> TrianglesEx<U> {
+    pub fn with_extra<U: AsRef<[f32]> + Copy>(self, extra: U) -> TrianglesEx<U> {
         TrianglesEx {
-            vertices: self.vertices.into_iter().map(|v| v.with_extra(extra)).collect(),
-            indexes: self.indexes
+            vertices: self
+                .vertices
+                .into_iter()
+                .map(|v| v.with_extra(extra))
+                .collect(),
+            indexes: self.indexes,
         }
     }
 
     /// Converts this to a triangle list where default extra items have been
     /// added to each vertex's attribute items
-    pub fn with_default_extra<U: AsRef<[f32]> + Default>(self) -> TrianglesEx<U> {
+    pub fn with_default_extra<U: AsRef<[f32]> + Copy + Default>(self) -> TrianglesEx<U> {
         self.with_extra(U::default())
     }
 }
@@ -149,7 +155,7 @@ pub struct Model {
 
 impl Model {
     /// Construct a model out of triangles
-    pub fn new<T: AsRef<[f32]>>(
+    pub fn new<T: AsRef<[f32]> + Copy>(
         gl: &Context,
         program: &Rc<ShaderProgram>,
         triangles: &TrianglesEx<T>,
@@ -216,26 +222,50 @@ impl<'a> RenderingModel<'a> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum TrianglesType {
     Agent,
+    GadgetRectangle,
 }
 
-pub type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
+type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
 
-pub fn triangles_map(gl: &Context) -> TrianglesMap {
+fn triangles_map(_: &()) -> TrianglesMap {
     [
         (
             TrianglesType::Agent,
-            Rc::new(
-                Triangles::new(vec![
+            Rc::new(Triangles::new(
+                vec![
                     Vertex::new(vec3(0.15, -0.15, 0.0), vec4(0.0, 0.8, 0.0, 1.0), []),
                     Vertex::new(vec3(0.15, 0.0, 0.0), vec4(0.0, 0.6, 0.0, 1.0), []),
                     Vertex::new(vec3(0.0, 0.15, 0.0), vec4(0.0, 0.4, 0.0, 1.0), []),
                     Vertex::new(vec3(-0.15, 0.0, 0.0), vec4(0.0, 0.6, 0.0, 1.0), []),
                     Vertex::new(vec3(-0.15, -0.15, 0.0), vec4(0.0, 0.8, 0.0, 1.0), []),
-                ], vec![0, 1, 2, 0, 2, 4, 2, 3, 4])
-                )
-        )
-    ].iter().cloned().collect()
+                ],
+                vec![0, 1, 2, 0, 2, 4, 2, 3, 4],
+            )),
+        ),
+        //                0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
+        (
+            TrianglesType::GadgetRectangle,
+            Rc::new(Triangles::new(
+                vec![
+                    Vertex::new(vec3(0.0, 0.0, 0.0), vec4(0.6, 0.8, 1.0, 1.0), []),
+                    Vertex::new(vec3(1.0, 0.0, 0.0), vec4(0.7, 0.9, 1.0, 1.0), []),
+                    Vertex::new(vec3(1.0, 1.0, 0.0), vec4(0.9, 1.0, 1.0, 1.0), []),
+                    Vertex::new(vec3(0.0, 1.0, 0.0), vec4(0.8, 1.0, 1.0, 1.0), []),
+                ],
+                vec![0, 1, 2, 2, 3, 0],
+            )),
+        ),
+    ]
+    .iter()
+    .cloned()
+    .collect()
 }
+
+ref_thread_local!(
+    pub static managed TRIANGLESES: StaticMap<TrianglesType, Rc<Triangles>, fn(&()) -> TrianglesMap, ()> = StaticMap::new(
+        triangles_map
+    );
+);
 
 /// Names of models
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -243,15 +273,24 @@ pub enum ModelType {
     Agent,
 }
 
-pub type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
+type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
 
-pub fn model_map(gl: &Context, shader_map: &ShaderMap, triangles_map: &TrianglesMap) -> ModelMap {
-    [
-        (
-            ModelType::Agent,
-            Rc::new(Model::new(gl, &shader_map[&ShaderType::Basic],
-                &triangles_map[&TrianglesType::Agent]
-                ))
-        )
-    ].iter().cloned().collect()
+ref_thread_local!(
+    pub static managed MODELS: StaticMap<ModelType, Rc<Model>, fn(&Context) -> ModelMap, Context> = StaticMap::new(
+        model_map
+    );
+);
+
+fn model_map(gl: &Context) -> ModelMap {
+    [(
+        ModelType::Agent,
+        Rc::new(Model::new(
+            gl,
+            &SHADERS.borrow()[ShaderType::Basic],
+            &TRIANGLESES.borrow()[TrianglesType::Agent],
+        )),
+    )]
+    .iter()
+    .cloned()
+    .collect()
 }

@@ -3,9 +3,10 @@ use conrod_core::widget;
 use conrod_core::Widget;
 use conrod_derive::WidgetCommon;
 
+use crate::log;
 use crate::gadget::Gadget;
-use crate::render::{UiRenderer, TrianglesEx};
 use crate::math::Vec2;
+use crate::render::{TrianglesEx, UiRenderer};
 use crate::shape::Shape;
 
 /// Triangles, but in 3D
@@ -84,7 +85,7 @@ impl Widget for Triangles3d {
         let widget::UpdateArgs { state, rect, .. } = args;
 
         let Self {
-            triangles,
+            mut triangles,
             src_center,
             src_width,
             src_height,
@@ -96,7 +97,13 @@ impl Widget for Triangles3d {
         let offset = vec2(x, y) - src_center * scale;
 
         for v in triangles.vertices_mut() {
-            v.extra = [scale as f32, scale as f32, offset.x as f32, offset.y as f32, 0.0];
+            v.extra = [
+                scale as f32,
+                scale as f32,
+                offset.x as f32,
+                offset.y as f32,
+                UiRenderer::UI_Z_BASE as f32,
+            ];
         }
 
         state.update(|state| {

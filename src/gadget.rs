@@ -1,13 +1,15 @@
 use cgmath::prelude::*;
-use cgmath::{vec2, vec4};
+use cgmath::{vec2, vec3, vec4};
 use fnv::{FnvHashMap, FnvHashSet};
 use golem::Context;
+use ref_thread_local::RefThreadLocal;
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
 
 use crate::grid::{Grid, WH, XY};
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
-use crate::render::{Camera, Model, ShaderMap, ShaderType, Triangles};
+use crate::render::TRIANGLESES;
+use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 pub type Port = u32;
@@ -355,28 +357,23 @@ impl GadgetRenderInfo {
         self.paths.clear();
 
         // Surrounding rectangle
-        let rect = Rectangle::new(
-            0.0,
-            gadget.size().0 as f64,
-            0.0,
-            gadget.size().1 as f64,
-            GadgetRenderInfo::RECTANGLE_Z,
-        );
-        rect.append_to(&mut self.positions, &mut self.indexes);
-        self.colors.extend(&[
-            0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
-        ]);
+        self.triangles.append({
+            let mut triangles = (*TRIANGLESES.borrow()[TrianglesType::GadgetRectangle]).clone();
+
+            for v in triangles.vertices_mut() {
+                v.position.x *= gadget.size().0 as f32;
+                v.position.y *= gadget.size().1 as f32;
+            }
+
+            triangles
+        });
 
         // Port circles
         let port_positions = gadget.port_positions();
         for vec in port_positions.iter() {
-            let circle = Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.05);
-            circle.append_to(&mut self.positions, &mut self.indexes);
-            self.colors.extend(
-                [0.0, 0.0, 0.75, 1.0]
-                    .iter()
-                    .cycle()
-                    .take(circle.num_vertices() * 4),
+            self.triangles.append(
+                Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.05)
+                    .triangles(vec4(0.0, 0.0, 0.75, 1.0)),
             );
         }
 
@@ -393,13 +390,9 @@ impl GadgetRenderInfo {
                 0.05,
                 true,
             );
-            path.append_to(&mut self.positions, &mut self.indexes);
-            self.colors.extend(
-                [0.0, 0.0, 0.0, 1.0]
-                    .iter()
-                    .cycle()
-                    .take(path.num_vertices() * 4),
-            );
+
+            self.triangles
+                .append(path.triangles(vec4(0.0, 0.0, 0.0, 1.0)));
         }
 
         // Paths
@@ -414,13 +407,8 @@ impl GadgetRenderInfo {
 
             // No redundant path drawing!
             if p0 <= p1 || directed {
-                path.append_to(&mut self.positions, &mut self.indexes);
-                self.colors.extend(
-                    [0.0, 0.0, 0.0, 1.0]
-                        .iter()
-                        .cycle()
-                        .take(path.num_vertices() * 4),
-                );
+                self.triangles
+                    .append(path.triangles(vec4(0.0, 0.0, 0.0, 1.0)));
             }
 
             if directed {
@@ -430,16 +418,26 @@ impl GadgetRenderInfo {
                 let v0 = end + dir * -0.2 + dir.right_ccw() * -0.1;
                 let v2 = end + dir * -0.2 + dir.right_ccw() * 0.1;
 
-                let old_len = self.positions().len() as u32 / 3;
-                #[rustfmt::skip]
-                self.positions.extend(&[
-                    v0.x as f32, v0.y as f32, GadgetRenderInfo::PATH_Z as f32,
-                    end.x as f32, end.y as f32, GadgetRenderInfo::PATH_Z as f32,
-                    v2.x as f32, v2.y as f32, GadgetRenderInfo::PATH_Z as f32,
-                ]);
-                self.colors
-                    .extend([0.0, 0.0, 0.0, 1.0].iter().cycle().take(4 * 3));
-                self.indexes.extend(&[old_len, old_len + 1, old_len + 2]);
+                self.triangles.append(Triangles::new(
+                    vec![
+                        Vertex::new(
+                            vec3(v0.x as f32, v0.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec4(0.0, 0.0, 0.0, 1.0),
+                            [],
+                        ),
+                        Vertex::new(
+                            vec3(end.x as f32, end.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec4(0.0, 0.0, 0.0, 1.0),
+                            [],
+                        ),
+                        Vertex::new(
+                            vec3(v2.x as f32, v2.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec4(0.0, 0.0, 0.0, 1.0),
+                            [],
+                        ),
+                    ],
+                    vec![0, 1, 2],
+                ));
             }
         }
     }

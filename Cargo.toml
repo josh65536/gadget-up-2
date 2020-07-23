@@ -27,6 +27,7 @@ panic = "abort"
 wasm-bindgen = "0.2.45"
 winit = { path = "winit", version = "0.22.2", features = ["web-sys"] }
 glow = "0.4.0"
+ref_thread_local = "0.0.0"
 golem = { path = "golem", version = "0.1.5", features = ["web-sys"] }
 fnv = "1.0.7"
 cgmath = "0.17.0"

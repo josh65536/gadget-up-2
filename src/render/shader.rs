@@ -3,7 +3,10 @@ use golem::Dimension::{D2, D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
+use ref_thread_local::ref_thread_local;
 use std::rc::Rc;
+
+use crate::static_map::StaticMap;
 
 /// The type of shader to use
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -16,9 +19,15 @@ pub enum ShaderType {
     ScaleOffset,
 }
 
-pub type ShaderMap = FnvHashMap<ShaderType, Rc<ShaderProgram>>;
+type ShaderMap = FnvHashMap<ShaderType, Rc<ShaderProgram>>;
 
-pub fn shader_map(gl: &Context) -> ShaderMap {
+ref_thread_local!(
+    pub static managed SHADERS: StaticMap<ShaderType, Rc<ShaderProgram>, fn(&Context) -> ShaderMap, Context> = StaticMap::new(
+        shader_map
+    );
+);
+
+fn shader_map(gl: &Context) -> ShaderMap {
     [
         (
             ShaderType::Basic,
@@ -64,7 +73,7 @@ pub fn shader_map(gl: &Context) -> ShaderMap {
             ).unwrap())
         ),
         (
-            ShaderType::Offset,
+            ShaderType::ScaleOffset,
             Rc::new(ShaderProgram::new(
                 gl,
                 ShaderDescription {

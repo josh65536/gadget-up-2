@@ -6,9 +6,9 @@ mod ui;
 
 pub use camera::Camera;
 pub use gadget::{GadgetRenderer, GridItemRenderer};
-pub use model::{Model, Triangles, Vertex, VertexEx, TrianglesEx};
-pub use model::{ModelMap, ModelType, model_map, TrianglesMap, TrianglesType, triangles_map};
-pub use shader::{shader_map, ShaderMap, ShaderType};
+pub use model::{Model, Triangles, TrianglesEx, Vertex, VertexEx};
+pub use model::{ModelType, TrianglesType, MODELS, TRIANGLESES};
+pub use shader::{ShaderType, SHADERS};
 pub use ui::UiRenderer;
 
 use crate::gadget::{Gadget, GadgetRenderInfo};

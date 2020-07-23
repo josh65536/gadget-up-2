@@ -385,6 +385,7 @@ dependencies = [
  "golem",
  "itertools",
  "js-sys",
+ "ref_thread_local",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -1086,6 +1087,12 @@ name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
+
+[[package]]
+name = "ref_thread_local"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d813022b2e00774a48eaf43caaa3c20b45f040ba8cbf398e2e8911a06668dbe6"
 
 [[package]]
 name = "rustc-hash"

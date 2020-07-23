@@ -1,4 +1,4 @@
-use super::{Camera, ShaderMap, ShaderType, TrianglesEx};
+use super::{Camera, ShaderType, TrianglesEx, TrianglesType, SHADERS, TRIANGLESES};
 use crate::gadget::{Gadget, GadgetRenderInfo};
 use crate::grid::{Grid, WH, XY};
 use crate::log;
@@ -9,6 +9,7 @@ use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use itertools::izip;
+use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 
 pub trait GridItemRenderer {
@@ -34,9 +35,9 @@ pub struct GadgetRenderer {
 }
 
 impl GadgetRenderer {
-    pub fn new(gl: &Rc<Context>, shader_map: &ShaderMap) -> Self {
+    pub fn new(gl: &Rc<Context>) -> Self {
         Self {
-            program: Rc::clone(&shader_map[&ShaderType::Offset]),
+            program: Rc::clone(&SHADERS.borrow()[ShaderType::Offset]),
             gl: Rc::clone(gl),
             triangles: TrianglesEx::default(),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
@@ -48,7 +49,13 @@ impl GadgetRenderer {
         let x = position.x as f32;
         let y = position.y as f32;
 
-        self.triangles.append(gadget.renderer().triangles().clone().with_extra([x, y, 0.0]));
+        self.triangles.append(
+            gadget
+                .renderer()
+                .triangles()
+                .clone()
+                .with_extra([x, y, 0.0]),
+        );
     }
 }
 
@@ -68,14 +75,11 @@ impl GridItemRenderer for GadgetRenderer {
             let x = position.x as f32;
             let y = position.y as f32;
 
-            let rect = Rectangle::new(0.0, 1.0, 0.0, 1.0, GadgetRenderInfo::RECTANGLE_Z);
-            rect.append_to(&mut self.positions, &mut self.indexes);
-
-            self.offsets
-                .extend(&[x, y, 0.0, x, y, 0.0, x, y, 0.0, x, y, 0.0]);
-            self.colors.extend(&[
-                0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
-            ]);
+            self.triangles.append(
+                (*TRIANGLESES.borrow()[TrianglesType::GadgetRectangle])
+                    .clone()
+                    .with_extra([x, y, GadgetRenderInfo::RECTANGLE_Z as f32]),
+            );
         }
     }
 
@@ -91,7 +95,8 @@ impl GridItemRenderer for GadgetRenderer {
             )
             .unwrap();
 
-        self.vertex_buffer.set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
+        self.vertex_buffer
+            .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
         self.index_buffer.set_data(&self.triangles.indexes());
 
         unsafe {

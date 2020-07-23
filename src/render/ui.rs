@@ -1,4 +1,4 @@
-use cgmath::vec3;
+use cgmath::{vec3, vec4};
 use conrod_core::render::{Primitive, PrimitiveKind};
 use conrod_core::Widget;
 use golem::Dimension::{D3, D4};
@@ -6,9 +6,11 @@ use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{Context, ShaderDescription, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use itertools::izip;
+use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 
-use super::{Camera, TrianglesEx};
+use super::{Camera, TrianglesEx, TrianglesType, VertexEx, TRIANGLESES};
+use super::{SHADERS, ShaderType};
 use crate::log;
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;
@@ -16,7 +18,7 @@ use crate::widget::triangles3d::Triangles3d;
 pub struct UiRenderer {
     gl: Rc<Context>,
     pub camera: Camera,
-    program: ShaderProgram,
+    program: Rc<ShaderProgram>,
     pub triangles: TrianglesEx<[f32; 5]>,
     vertex_buffer: VertexBuffer,
     index_buffer: ElementBuffer,
@@ -36,31 +38,10 @@ impl UiRenderer {
             1.0,
         );
 
-        let program = ShaderProgram::new(
-            gl,
-            ShaderDescription {
-                vertex_input: &[
-                    Attribute::new("v_position", AttributeType::Vector(D3)),
-                    Attribute::new("v_offset", AttributeType::Vector(D3)),
-                    Attribute::new("v_color", AttributeType::Vector(D4)),
-                ],
-                fragment_input: &[Attribute::new("f_color", AttributeType::Vector(D4))],
-                uniforms: &[Uniform::new("transform", UniformType::Matrix(D4))],
-                vertex_shader: r#"void main() {
-                    f_color = v_color;
-                    gl_Position = transform * vec4(v_position + v_offset, 1.0);
-                }"#,
-                fragment_shader: r#"void main() {
-                    gl_FragColor = f_color;
-                }"#,
-            },
-        )
-        .unwrap();
-
         Self {
             gl: Rc::clone(gl),
             camera,
-            program,
+            program: Rc::clone(&SHADERS.borrow()[ShaderType::ScaleOffset]),
             triangles: TrianglesEx::default(),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
@@ -85,7 +66,8 @@ impl UiRenderer {
             )
             .unwrap();
 
-        self.vertex_buffer.set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
+        self.vertex_buffer
+            .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
         self.index_buffer.set_data(&self.triangles.indexes());
 
         unsafe {
@@ -109,86 +91,103 @@ impl UiRenderer {
 
         match kind {
             PrimitiveKind::Rectangle { color } => {
-                let rect = Rectangle::new(-w / 2.0, w / 2.0, -h / 2.0, h / 2.0, 0.0);
-
-                rect.append_to(&mut self.positions, &mut self.indexes);
-
-                self.offsets.extend(
-                    [x as f32, y as f32, UiRenderer::UI_Z_BASE as f32]
-                        .iter()
-                        .cycle()
-                        .take(4 * 3),
-                );
                 let rgba = color.to_rgb();
-                self.colors
-                    .extend([rgba.0, rgba.1, rgba.2, rgba.3].iter().cycle().take(4 * 4));
+
+                self.triangles.append(
+                    Rectangle::new(-w / 2.0, w / 2.0, -h / 2.0, h / 2.0, 0.0)
+                        .triangles(vec4(rgba.0, rgba.1, rgba.2, rgba.3))
+                        .with_extra([1.0, 1.0, x as f32, y as f32, UiRenderer::UI_Z_BASE as f32]),
+                );
             }
 
             PrimitiveKind::TrianglesSingleColor {
                 color: rgba,
                 triangles,
             } => {
-                let p_len = self.positions.len() as u32 / 3;
-                self.positions.extend(triangles.iter().flat_map(|t| {
-                    vec![
-                        t[0][0] as f32,
-                        t[0][1] as f32,
-                        0.0,
-                        t[1][0] as f32,
-                        t[1][1] as f32,
-                        0.0,
-                        t[2][0] as f32,
-                        t[2][1] as f32,
-                        0.0,
-                    ]
-                }));
-                let t_len = triangles.len() as u32 * 3;
-                self.indexes.extend(p_len..(p_len + t_len));
+                let color = vec4(rgba.0, rgba.1, rgba.2, rgba.3);
+                let extra = [1.0, 1.0, 0.0, 0.0, 0.0];
 
-                self.offsets.extend(
-                    [0.0, 0.0, UiRenderer::UI_Z_BASE as f32]
+                self.triangles.append(TrianglesEx::new(
+                    triangles
                         .iter()
-                        .cycle()
-                        .take(t_len as usize * 3),
-                );
-                self.colors.extend(
-                    [rgba.0, rgba.1, rgba.2, rgba.3]
-                        .iter()
-                        .cycle()
-                        .take(t_len as usize * 4),
-                );
+                        .flat_map(|t| {
+                            vec![
+                                VertexEx::new(
+                                    vec3(
+                                        t[0][0] as f32,
+                                        t[0][1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    color,
+                                    extra,
+                                ),
+                                VertexEx::new(
+                                    vec3(
+                                        t[1][0] as f32,
+                                        t[1][1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    color,
+                                    extra,
+                                ),
+                                VertexEx::new(
+                                    vec3(
+                                        t[2][0] as f32,
+                                        t[2][1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    color,
+                                    extra,
+                                ),
+                            ]
+                            .into_iter()
+                        })
+                        .collect(),
+                    (0..(triangles.len() as u32 * 3)).collect(),
+                ));
             }
 
             PrimitiveKind::TrianglesMultiColor { triangles } => {
-                let p_len = self.positions.len() as u32 / 3;
-                self.positions.extend(triangles.iter().flat_map(|t| {
-                    vec![
-                        t[0].0[0] as f32,
-                        t[0].0[1] as f32,
-                        0.0,
-                        t[1].0[0] as f32,
-                        t[1].0[1] as f32,
-                        0.0,
-                        t[2].0[0] as f32,
-                        t[2].0[1] as f32,
-                        0.0,
-                    ]
-                }));
-                let t_len = triangles.len() as u32 * 3;
-                self.indexes.extend(p_len..(p_len + t_len));
+                let extra = [1.0, 1.0, 0.0, 0.0, 0.0];
 
-                self.offsets.extend(
-                    [0.0, 0.0, UiRenderer::UI_Z_BASE as f32]
+                self.triangles.append(TrianglesEx::new(
+                    triangles
                         .iter()
-                        .cycle()
-                        .take(t_len as usize * 3),
-                );
-                self.colors.extend(triangles.iter().flat_map(|t| {
-                    vec![
-                        t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3, t[1].1 .0, t[1].1 .1,
-                        t[1].1 .2, t[1].1 .3, t[2].1 .0, t[2].1 .1, t[2].1 .2, t[2].1 .3,
-                    ]
-                }));
+                        .flat_map(|t| {
+                            vec![
+                                VertexEx::new(
+                                    vec3(
+                                        t[0].0[0] as f32,
+                                        t[0].0[1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
+                                    extra,
+                                ),
+                                VertexEx::new(
+                                    vec3(
+                                        t[1].0[0] as f32,
+                                        t[1].0[1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
+                                    extra,
+                                ),
+                                VertexEx::new(
+                                    vec3(
+                                        t[2].0[0] as f32,
+                                        t[2].0[1] as f32,
+                                        UiRenderer::UI_Z_BASE as f32,
+                                    ),
+                                    vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
+                                    extra,
+                                ),
+                            ]
+                            .into_iter()
+                        })
+                        .collect(),
+                    (0..(triangles.len() as u32 * 3)).collect(),
+                ));
             }
 
             PrimitiveKind::Image {

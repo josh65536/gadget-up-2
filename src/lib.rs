@@ -5,6 +5,7 @@ extern crate conrod_winit;
 extern crate fnv;
 extern crate glow;
 extern crate itertools;
+extern crate ref_thread_local;
 extern crate winit;
 
 mod bitfield;
@@ -14,6 +15,7 @@ mod math;
 mod preset_gadgets;
 mod render;
 mod shape;
+mod static_map;
 mod ui;
 mod widget;
 
@@ -22,14 +24,12 @@ use conrod_core::{Ui, UiBuilder};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
 use golem::blend::{BlendInput, BlendMode, BlendOperation};
 use golem::depth::{DepthTestFunction, DepthTestMode};
-use golem::ShaderProgram;
-
 use golem::Context;
-
+use golem::ShaderProgram;
+use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::MouseScrollDelta;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -42,7 +42,7 @@ use gadget::{Agent, Gadget, GadgetDef};
 use grid::Grid;
 use math::Vec2;
 use render::{Camera, GadgetRenderer, Model, UiRenderer};
-use render::{ShaderMap, ShaderType, ModelMap, ModelType, TrianglesMap, TrianglesType};
+use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
 use ui::{Mode, WidgetIds};
 
 #[macro_export]
@@ -65,9 +65,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub struct App {
     gl: Rc<Context>,
-    shaders: ShaderMap,
-    triangleses: TrianglesMap,
-    models: ModelMap,
     camera: Camera,
     center: Vec2,
     height: f64,
@@ -92,7 +89,7 @@ impl App {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
 
-    pub fn new(gl: &Rc<Context>, ui: &mut Ui, _width: u32, _height: u32) -> Self {
+    pub fn new(gl: Rc<Context>, ui: &mut Ui, _width: u32, _height: u32) -> Self {
         let camera = Camera::new_orthographic(
             vec3(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, -1.0),
@@ -131,21 +128,21 @@ impl App {
         let gadget_select_rep = Gadget::new(&Rc::new(def), (1, 1), vec![], 0);
 
         let widget_ids = WidgetIds::new(ui.widget_id_generator());
-        
-        let shaders = render::shader_map(gl);
-        let triangleses = render::triangles_map(gl);
-        let models = render::model_map(gl, &shaders, &triangleses);
+
+        SHADERS.borrow_mut().init(&gl);
+        TRIANGLESES.borrow_mut().init(&());
+        MODELS.borrow_mut().init(&gl);
+
+        let gadget_renderer = GadgetRenderer::new(&gl);
+        let ui_renderer = UiRenderer::new(&gl);
 
         Self {
-            gl: Rc::clone(gl),
-            shaders,
-            triangleses,
-            models,
+            gl,
             camera,
             center: vec2(0.0, 0.0),
             height: 10.0,
             grid,
-            gadget_renderer: GadgetRenderer::new(&gl, &shaders),
+            gadget_renderer,
             gadget_select: preset_gadgets::preset_gadgets(),
             gadget_selection: None,
             gadget_tile: None,
@@ -156,7 +153,7 @@ impl App {
             gadget_select_rep,
             mode: Mode::None,
             ids: widget_ids,
-            ui_renderer: UiRenderer::new(&gl),
+            ui_renderer,
         }
     }
 
@@ -181,16 +178,14 @@ impl App {
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
         if let Some(model) = &self.gadget_tile_model {
-            model
-                .prepare_render()
-                .render_position(
-                    vec3(
-                        self.gadget_tile_xy.x as f64,
-                        self.gadget_tile_xy.y as f64,
-                        -0.25,
-                    ),
-                    &self.camera,
-                );
+            model.prepare_render().render_position(
+                vec3(
+                    self.gadget_tile_xy.x as f64,
+                    self.gadget_tile_xy.y as f64,
+                    -0.25,
+                ),
+                &self.camera,
+            );
         }
 
         if let Some(agent) = &self.agent {
@@ -350,7 +345,7 @@ pub fn main_js() -> Result<(), JsValue> {
             unsafe { std::mem::transmute_copy(&()) }
         };
 
-        Context::from_glow(gl).unwrap()
+        Rc::new(Context::from_glow(gl).unwrap())
     };
 
     gl.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -367,12 +362,7 @@ pub fn main_js() -> Result<(), JsValue> {
     let mut frame = 0;
 
     let mut ui = UiBuilder::new([original_width, original_height]).build();
-    let mut app = App::new(
-        &Rc::new(gl),
-        &mut ui,
-        original_width as u32,
-        original_height as u32,
-    );
+    let mut app = App::new(gl, &mut ui, original_width as u32, original_height as u32);
 
     let mut width = original_width;
     let mut height = original_height;
