@@ -1,3 +1,4 @@
+extern crate bitvec;
 extern crate cgmath;
 extern crate conrod_core;
 extern crate conrod_derive;
@@ -5,13 +6,13 @@ extern crate conrod_winit;
 extern crate fnv;
 extern crate glow;
 extern crate itertools;
+extern crate percent_encoding;
 extern crate ref_thread_local;
-extern crate winit;
 extern crate ron;
 extern crate serde;
-extern crate percent_encoding;
-extern crate bitvec;
+extern crate winit;
 
+mod bit_serde;
 mod bitfield;
 mod gadget;
 mod grid;
@@ -22,9 +23,7 @@ mod shape;
 mod static_map;
 mod ui;
 mod widget;
-mod bit_serde;
 
-use percent_encoding::{AsciiSet, utf8_percent_encode, percent_decode_str};
 use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
@@ -32,6 +31,7 @@ use golem::blend::{BlendInput, BlendMode, BlendOperation};
 use golem::depth::{DepthTestFunction, DepthTestMode};
 use golem::Context;
 use golem::ShaderProgram;
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet};
 use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -57,6 +57,16 @@ macro_rules! log {
         // To get rid of the unnecessary rust-analyzer error
         unsafe {
             web_sys::console::log_1(&format!( $($t)* ).into());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! elog {
+    ( $($t:tt)* ) => {
+        // To get rid of the unnecessary rust-analyzer error
+        unsafe {
+            web_sys::console::error_1(&format!( $($t)* ).into());
         }
     };
 }
@@ -103,7 +113,7 @@ impl App {
             1.0,
         );
 
-        let grid = Grid::new();
+        let grid = load_grid_from_url().unwrap_or_else(|| Grid::new());
 
         //let def = GadgetDef::from_traversals(2, 2, vec![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
 
@@ -244,10 +254,18 @@ impl App {
                         }
                     }
 
-                    VirtualKeyCode::F => {
+                    VirtualKeyCode::X => {
                         if let ElementState::Pressed = state {
                             if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.flip_ports();
+                                gadget.flip_ports_x();
+                            }
+                        }
+                    }
+
+                    VirtualKeyCode::Y => {
+                        if let ElementState::Pressed = state {
+                            if let Some(gadget) = &mut self.gadget_tile {
+                                gadget.flip_ports_y();
                             }
                         }
                     }
@@ -275,6 +293,7 @@ impl App {
 
                         if let Some(dir) = dir {
                             self.agent.as_mut().unwrap().advance(&mut self.grid, dir);
+                            save_grid_in_url(&self.grid);
                         }
                     }
                 }
@@ -307,10 +326,60 @@ const SPECIAL_CHARS: AsciiSet = percent_encoding::NON_ALPHANUMERIC
     .remove(b'/')
     .remove(b'?');
 
-/// Saves the grid as part of the URL's hash map
-pub fn save_grid_in_url(grid: &Grid<Gadget>) {
-    let string = utf8_percent_encode(&ron::to_string(grid).unwrap(), &SPECIAL_CHARS).to_string();
-    window().location().set_hash(&string).unwrap();
+/// Attempts to save the grid as part of the URL's hash map, and returs whether it saved
+pub fn save_grid_in_url(grid: &Grid<Gadget>) -> bool {
+    let (base64, padding) = bit_serde::to_base64(grid)
+        .map_err(|e| {
+            elog!("Grid failed to save: {}", e);
+            e
+        })
+        .unwrap_or_else(|e| (String::new(), 0));
+
+    if base64.is_empty() {
+        window().location().set_hash("").unwrap();
+        return false;
+    }
+
+    let string = format!("{}{}", base64, padding);
+    window().location().set_hash(&string).map_or_else(
+        |e| {
+            elog!("Grid failed to save: {:?}", e);
+            false
+        },
+        |()| true,
+    )
+}
+
+pub fn load_grid_from_url() -> Option<Grid<Gadget>> {
+    // Avoid panicking here
+    let mut string = window().location().hash().ok()?;
+
+    if string.len() == 0 {
+        return None;
+    }
+
+    string = string.replace("#", "");
+
+    let padding = string
+        .pop()
+        .or_else(|| {
+            elog!("Failed to load grid: URL hash is empty");
+            None
+        })?
+        .to_string()
+        .parse()
+        .or_else(|e| {
+            elog!("Failed to load grid: {}", e);
+            Err(e)
+        })
+        .ok()?;
+
+    bit_serde::from_base64(&string, padding)
+        .or_else(|e| {
+            elog!("Failed to load grid: {}", e);
+            Err(e)
+        })
+        .ok()
 }
 
 // This is like the `main` function, except for JavaScript.

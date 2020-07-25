@@ -81,8 +81,8 @@ impl App {
                         } else {
                             self.grid.insert(gadget.clone(), xy, gadget.size());
                             // TODO: Move to a more central place
-                            crate::save_grid_in_url(&self.grid);
                         }
+                        crate::save_grid_in_url(&self.grid);
                     }
                 }
 

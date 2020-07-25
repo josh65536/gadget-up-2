@@ -1,5 +1,5 @@
-use std::fmt::{self, Display, Formatter};
 use serde::{de, ser};
+use std::fmt::{self, Display, Formatter};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

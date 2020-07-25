@@ -3,11 +3,12 @@ use cgmath::{vec2, vec3, vec4};
 use fnv::{FnvHashMap, FnvHashSet};
 use golem::Context;
 use ref_thread_local::RefThreadLocal;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 use crate::grid::{Grid, WH, XY};
+use crate::log;
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
 use crate::render::{GadgetRenderInfo, ModelType, MODELS, SHADERS, TRIANGLESES};
@@ -73,8 +74,8 @@ macro_rules! spsp_multi {
 /// Definition of a gadget, including ports, states, and transitions
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GadgetDef {
-    num_ports: usize,
     num_states: usize,
+    num_ports: usize,
     traversals: FnvHashSet<SPSP>,
 }
 
@@ -82,10 +83,24 @@ impl GadgetDef {
     /// Constructs the "nope" gadget
     pub fn new(num_states: usize, num_ports: usize) -> Self {
         Self {
-            num_ports,
             num_states,
+            num_ports,
             traversals: FnvHashSet::default(),
         }
+    }
+
+    /// Checks if all the invariants are satisfied:
+    ///
+    /// * At least 1 state exists.
+    /// * The states and ports of the traversals are not out of bounds.
+    fn is_valid(&self) -> bool {
+        self.num_states > 0
+            && self.traversals.iter().all(|((s0, p0), (s1, p1))| {
+                s0.0 < self.num_states
+                    && s1.0 < self.num_states
+                    && p0.0 < self.num_ports
+                    && p1.0 < self.num_ports
+            })
     }
 
     pub fn from_traversals<I: IntoIterator<Item = SPSP>>(
@@ -134,7 +149,7 @@ impl GadgetDef {
 /// Instead of the gadget def, it contains an index
 /// into a list of gadget defs.
 /// No rendering info is stored.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GadgetSerde {
     def: usize,
     size: WH,
@@ -179,12 +194,16 @@ impl Gadget {
     ///
     /// `defs` is a list of gadget defs.
     /// `defs_inv` is an "inverse Vec" of gadget defs.
-    pub fn get_serializable(&self, defs: &mut Vec<Rc<GadgetDef>>, defs_inv: &mut FnvHashMap<*const GadgetDef, usize>) -> GadgetSerde {
+    pub fn get_serializable(
+        &self,
+        defs: &mut Vec<Rc<GadgetDef>>,
+        defs_inv: &mut FnvHashMap<*const GadgetDef, usize>,
+    ) -> GadgetSerde {
         let index = if let Some(index) = defs_inv.get(&(&*self.def as *const GadgetDef)) {
             *index
         } else {
             defs.push(Rc::clone(&self.def));
-            defs_inv.insert(&*self.def as *const GadgetDef, defs.len());
+            defs_inv.insert(&*self.def as *const GadgetDef, defs.len() - 1);
             defs_inv.len() - 1
         };
 
@@ -197,7 +216,12 @@ impl Gadget {
     }
 
     pub fn from_serializable(gadget: GadgetSerde, defs: &Vec<Rc<GadgetDef>>) -> Self {
-        Self::new(&defs[gadget.def], gadget.size, gadget.port_map, gadget.state)
+        Self::new(
+            &defs[gadget.def],
+            gadget.size,
+            gadget.port_map,
+            gadget.state,
+        )
     }
 
     pub fn def(&self) -> &Rc<GadgetDef> {
@@ -206,6 +230,10 @@ impl Gadget {
 
     pub fn size(&self) -> WH {
         self.size
+    }
+
+    pub fn perimeter(&self) -> usize {
+        2 * self.size.0 + 2 * self.size.1
     }
 
     pub fn port(&self, index: usize) -> Option<Port> {
@@ -287,9 +315,10 @@ impl Gadget {
     pub fn rotate_ports(&mut self, num_spaces: i32) {
         self.dirty.set(true);
         let rem = (-num_spaces).rem_euclid(self.port_map.len() as i32);
+        let perimeter = self.perimeter();
 
         for idx in self.port_map.iter_mut() {
-            *idx = (*idx + rem as usize).rem_euclid((2 * self.size.0 + 2 * self.size.1) as usize)
+            *idx = (*idx + rem as usize).rem_euclid(perimeter)
         }
     }
 
@@ -305,10 +334,25 @@ impl Gadget {
         }
     }
 
-    /// Temporary function to flip ports; in a hurry
-    pub fn flip_ports(&mut self) {
+    /// Flips ports across the x axis
+    pub fn flip_ports_x(&mut self) {
         self.dirty.set(true);
-        self.port_map.reverse();
+        let perimeter = self.perimeter() as isize;
+
+        for idx in self.port_map.iter_mut() {
+            *idx = (self.size.0 as isize - *idx as isize - 1).rem_euclid(perimeter) as usize
+        }
+    }
+
+    /// Flips ports across the y axis
+    pub fn flip_ports_y(&mut self) {
+        self.dirty.set(true);
+        let perimeter = self.perimeter() as isize;
+
+        for idx in self.port_map.iter_mut() {
+            *idx = (perimeter - self.size.1 as isize - *idx as isize - 1).rem_euclid(perimeter)
+                as usize
+        }
     }
 
     /// Adds 1 to the state; resetting it to 0 in case of overflow
@@ -352,16 +396,79 @@ impl Clone for Gadget {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GadgetGridSerde {
     defs: Vec<GadgetDef>,
     gadgets: Vec<(GadgetSerde, (isize, isize))>,
 }
 
+impl GadgetGridSerde {
+    /// Is a no-op if this is valid,
+    /// but returns an error otherwise.
+    fn validate<'de, D: Deserializer<'de>>(self) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        for def in &self.defs {
+            if !def.is_valid() {
+                return Err(D::Error::custom(&format!(
+                    "Gadget def {:?} is not valid",
+                    def
+                )));
+            }
+        }
+
+        // Now validate the gadgets
+        for (gadget, _) in &self.gadgets {
+            // index must be in bounds
+            let def = self.defs.get(gadget.def).ok_or_else(|| {
+                D::Error::custom(&format!(
+                    "Gadget {:?} is not valid because its def is out of bounds",
+                    gadget
+                ))
+            })?;
+
+            // size must be positive
+            if gadget.size.0 == 0 || gadget.size.1 == 0 {
+                return Err(D::Error::custom(&format!(
+                    "Gadget {:?} with def {:?} is not valid because its size is not positive",
+                    gadget, def
+                )));
+            }
+
+            // state must be in bounds
+            if gadget.state.0 >= def.num_states() {
+                return Err(D::Error::custom(&format!(
+                    "Gadget {:?} with def {:?} is not valid because its state is out of bounds",
+                    gadget, def
+                )));
+            }
+
+            // port map must be the right size and in bounds, and also be a 1-to-1 map
+            if gadget.port_map.len() != def.num_ports() {
+                return Err(D::Error::custom(&format!("Gadget {:?} with def {:?} is not valid because its port map is not the right size", gadget, def)));
+            }
+
+            if gadget
+                .port_map
+                .iter()
+                .any(|i| *i >= 2 * gadget.size.0 + 2 * gadget.size.1)
+            {
+                return Err(D::Error::custom(&format!("Gadget {:?} with def {:?} is not valid because a port position index is out of bounds", gadget, def)));
+            }
+
+            if gadget.port_map.iter().collect::<FnvHashSet<_>>().len() != gadget.port_map.len() {
+                return Err(D::Error::custom(&format!("Gadget {:?} with def {:?} is not valid because 2 ports map to the same position", gadget, def)));
+            }
+        }
+
+        Ok(self)
+    }
+}
+
 impl Serialize for Grid<Gadget> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         let mut defs = vec![];
         let mut defs_inv = FnvHashMap::default();
@@ -374,7 +481,7 @@ impl Serialize for Grid<Gadget> {
 
         let grid_serde = GadgetGridSerde {
             defs: defs.into_iter().map(|def| (*def).clone()).collect(),
-            gadgets
+            gadgets,
         };
 
         grid_serde.serialize(serializer)
@@ -384,11 +491,10 @@ impl Serialize for Grid<Gadget> {
 impl<'de> Deserialize<'de> for Grid<Gadget> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
-        let GadgetGridSerde {
-            defs, gadgets
-        } = GadgetGridSerde::deserialize(deserializer)?;
+        let GadgetGridSerde { defs, gadgets } =
+            GadgetGridSerde::deserialize(deserializer)?.validate::<D>()?;
 
         let defs = defs.into_iter().map(|def| Rc::new(def)).collect();
 
@@ -399,7 +505,7 @@ impl<'de> Deserialize<'de> for Grid<Gadget> {
             let size = gadget.size;
             grid.insert(gadget, vec2(x, y), size);
         }
-        
+
         Ok(grid)
     }
 }
@@ -557,7 +663,9 @@ mod test {
         let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
 
         let expected = sp_multi![].collect::<FnvHashSet<_>>();
-        let result = def.targets_from_state_port((State(0), Port(1))).collect::<FnvHashSet<_>>();
+        let result = def
+            .targets_from_state_port((State(0), Port(1)))
+            .collect::<FnvHashSet<_>>();
         assert_eq!(result, expected);
     }
 
@@ -566,7 +674,9 @@ mod test {
         let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))]);
 
         let expected = sp_multi![(0, 0)].collect::<FnvHashSet<_>>();
-        let result = def.targets_from_state_port((State(1), Port(1))).collect::<FnvHashSet<_>>();
+        let result = def
+            .targets_from_state_port((State(1), Port(1)))
+            .collect::<FnvHashSet<_>>();
         assert_eq!(result, expected);
     }
 
@@ -575,17 +685,23 @@ mod test {
         let def = GadgetDef::from_traversals(2, 2, spsp_multi![((0, 0), (1, 1)), ((0, 0), (0, 1))]);
 
         let expected = sp_multi![(1, 1), (0, 1)].collect::<FnvHashSet<_>>();
-        let result = def.targets_from_state_port((State(0), Port(0))).collect::<FnvHashSet<_>>();
+        let result = def
+            .targets_from_state_port((State(0), Port(0)))
+            .collect::<FnvHashSet<_>>();
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_port_traversals_in_state_empty() {
-        let def = GadgetDef::from_traversals(4, 4,
+        let def = GadgetDef::from_traversals(
+            4,
+            4,
             spsp_multi![
-                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
-                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
-            ]
+                ((0, 0), (1, 1)),
+                ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)),
+                ((1, 2), (3, 3)),
+            ],
         );
 
         let expected = pp_multi![].collect::<FnvHashSet<_>>();
@@ -595,11 +711,15 @@ mod test {
 
     #[test]
     fn test_port_traversals_in_state_one() {
-        let def = GadgetDef::from_traversals(4, 4,
+        let def = GadgetDef::from_traversals(
+            4,
+            4,
             spsp_multi![
-                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
-                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
-            ]
+                ((0, 0), (1, 1)),
+                ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)),
+                ((1, 2), (3, 3)),
+            ],
         );
 
         let expected = pp_multi![(2, 3)].collect::<FnvHashSet<_>>();
@@ -609,15 +729,231 @@ mod test {
 
     #[test]
     fn test_port_traversals_in_state_multiple() {
-        let def = GadgetDef::from_traversals(4, 4,
+        let def = GadgetDef::from_traversals(
+            4,
+            4,
             spsp_multi![
-                ((0, 0), (1, 1)), ((2, 0), (3, 1)),
-                ((0, 2), (2, 3)), ((1, 2), (3, 3)),
-            ]
+                ((0, 0), (1, 1)),
+                ((2, 0), (3, 1)),
+                ((0, 2), (2, 3)),
+                ((1, 2), (3, 3)),
+            ],
         );
 
         let expected = pp_multi![(0, 1), (2, 3)].collect::<FnvHashSet<_>>();
         let result = def.port_traversals_in_state(State(0));
         assert_eq!(result, expected)
+    }
+
+    fn assert_gadget_def_valid(def: &GadgetDef) {
+        assert!(def.is_valid(), "Gadget def {:?} is not valid", def);
+    }
+
+    #[test]
+    fn test_gadget_def_valid() {
+        let def = GadgetDef::new(1, 0);
+        assert_gadget_def_valid(&def);
+
+        let def = GadgetDef::from_traversals(2, 3, spsp_multi![((0, 0), (1, 1)), ((1, 2), (0, 0))]);
+        assert_gadget_def_valid(&def);
+
+        let def = GadgetDef::from_traversals(3, 2, spsp_multi![((0, 0), (1, 1)), ((2, 1), (0, 0))]);
+        assert_gadget_def_valid(&def);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid")]
+    fn test_gadget_def_invalid_no_states() {
+        let def = GadgetDef::new(0, 3);
+        assert_gadget_def_valid(&def);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid")]
+    fn test_gadget_def_out_of_bounds_state() {
+        let def = GadgetDef::from_traversals(2, 3, spsp_multi![((0, 0), (1, 1)), ((2, 1), (0, 0))]);
+        assert_gadget_def_valid(&def);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid")]
+    fn test_gadget_def_out_of_bounds_port() {
+        let def = GadgetDef::from_traversals(3, 2, spsp_multi![((0, 0), (1, 1)), ((1, 2), (0, 0))]);
+        assert_gadget_def_valid(&def);
+    }
+
+    fn assert_gadget_grid_serde_valid<'de>(grid: GadgetGridSerde) {
+        grid.validate::<&mut crate::bit_serde::Deserializer<'de>>()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_gadget_grid_serde_valid() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 3, 1],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its def is out of bounds")]
+    fn test_gadget_grid_serde_invalid_out_of_bounds_def() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 1,
+                    size: (1, 1),
+                    port_map: vec![0, 3, 1],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its size is not positive")]
+    fn test_gadget_grid_serde_invalid_zero_width() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (0, 1),
+                    port_map: vec![0, 3, 1],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its size is not positive")]
+    fn test_gadget_grid_serde_invalid_zero_height() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 0),
+                    port_map: vec![0, 3, 1],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its state is out of bounds")]
+    fn test_gadget_grid_serde_invalid_out_of_bounds_state() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 3, 1],
+                    state: State(2),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its port map is not the right size")]
+    fn test_gadget_grid_serde_invalid_port_map_small() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 3],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because its port map is not the right size")]
+    fn test_gadget_grid_serde_invalid_port_map_big() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 3, 1, 2],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because a port position index is out of bounds")]
+    fn test_gadget_grid_serde_invalid_port_map_out_of_bounds() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 4, 1],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not valid because 2 ports map to the same position")]
+    fn test_gadget_grid_serde_invalid_port_map_not_one_to_one() {
+        let defs = vec![GadgetDef::new(2, 3)];
+        let grid = GadgetGridSerde {
+            defs,
+            gadgets: vec![(
+                GadgetSerde {
+                    def: 0,
+                    size: (1, 1),
+                    port_map: vec![0, 3, 3],
+                    state: State(1),
+                },
+                (1, -1),
+            )],
+        };
+        assert_gadget_grid_serde_valid(grid);
     }
 }
