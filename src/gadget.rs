@@ -314,8 +314,8 @@ impl Gadget {
     /// a negative number means clockwise.
     pub fn rotate_ports(&mut self, num_spaces: i32) {
         self.dirty.set(true);
-        let rem = (-num_spaces).rem_euclid(self.port_map.len() as i32);
         let perimeter = self.perimeter();
+        let rem = (num_spaces).rem_euclid(perimeter as i32);
 
         for idx in self.port_map.iter_mut() {
             *idx = (*idx + rem as usize).rem_euclid(perimeter)
