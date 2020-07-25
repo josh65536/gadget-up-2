@@ -28,6 +28,10 @@ wasm-bindgen = "0.2.45"
 winit = { path = "winit", version = "0.22.2", features = ["web-sys"] }
 glow = "0.4.0"
 ref_thread_local = "0.0.0"
+serde = { version = "1.0.114", features = ["derive"] }
+ron = "0.6.0"
+bitvec = "0.17.4"
+percent-encoding = "2.1.0"
 golem = { path = "golem", version = "0.1.5", features = ["web-sys"] }
 fnv = "1.0.7"
 cgmath = "0.17.0"
@@ -45,7 +49,7 @@ wee_alloc = { version = "0.4.2", optional = true }
 # like the DOM.
 [dependencies.web-sys]
 version = "0.3.22"
-features = ["console"]
+features = ["console", "Location"]
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires

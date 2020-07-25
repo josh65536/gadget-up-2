@@ -7,6 +7,10 @@ extern crate glow;
 extern crate itertools;
 extern crate ref_thread_local;
 extern crate winit;
+extern crate ron;
+extern crate serde;
+extern crate percent_encoding;
+extern crate bitvec;
 
 mod bitfield;
 mod gadget;
@@ -18,7 +22,9 @@ mod shape;
 mod static_map;
 mod ui;
 mod widget;
+mod bit_serde;
 
+use percent_encoding::{AsciiSet, utf8_percent_encode, percent_decode_str};
 use cgmath::{vec2, vec3};
 use conrod_core::{Ui, UiBuilder};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
@@ -276,6 +282,35 @@ impl App {
             _ => {}
         }
     }
+}
+
+/// Characters that are special in the fragment portion of a URL,
+/// as defined in https://tools.ietf.org/rfc/rfc3986.txt, page 49
+const SPECIAL_CHARS: AsciiSet = percent_encoding::NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~')
+    .remove(b'!')
+    .remove(b'$')
+    .remove(b'&')
+    .remove(b'\'')
+    .remove(b'(')
+    .remove(b')')
+    .remove(b'*')
+    .remove(b'+')
+    .remove(b',')
+    .remove(b';')
+    .remove(b'=')
+    .remove(b':')
+    .remove(b'@')
+    .remove(b'/')
+    .remove(b'?');
+
+/// Saves the grid as part of the URL's hash map
+pub fn save_grid_in_url(grid: &Grid<Gadget>) {
+    let string = utf8_percent_encode(&ron::to_string(grid).unwrap(), &SPECIAL_CHARS).to_string();
+    window().location().set_hash(&string).unwrap();
 }
 
 // This is like the `main` function, except for JavaScript.

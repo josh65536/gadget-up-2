@@ -40,6 +40,10 @@ impl<T> Grid<T> {
         Some((t, *xy, *wh))
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &(T, XY, WH)> {
+        self.items.values()
+    }
+
     pub fn get_in_bounds(
         &self,
         min_x: f64,

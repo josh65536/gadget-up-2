@@ -5,6 +5,7 @@ use golem::Context;
 use ref_thread_local::RefThreadLocal;
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 use crate::grid::{Grid, WH, XY};
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
@@ -12,7 +13,8 @@ use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex}
 use crate::render::{GadgetRenderInfo, ModelType, MODELS, SHADERS, TRIANGLESES};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Port(pub usize);
 
 impl Port {
@@ -22,7 +24,8 @@ impl Port {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct State(pub usize);
 
 impl State {
@@ -68,7 +71,7 @@ macro_rules! spsp_multi {
 }
 
 /// Definition of a gadget, including ports, states, and transitions
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GadgetDef {
     num_ports: usize,
     num_states: usize,
@@ -127,6 +130,18 @@ impl GadgetDef {
     }
 }
 
+/// Gadget that can be serialized and deserialized.
+/// Instead of the gadget def, it contains an index
+/// into a list of gadget defs.
+/// No rendering info is stored.
+#[derive(Serialize, Deserialize)]
+pub struct GadgetSerde {
+    def: usize,
+    size: WH,
+    port_map: Vec<usize>,
+    state: State,
+}
+
 pub struct Gadget {
     def: Rc<GadgetDef>,
     size: WH,
@@ -156,6 +171,33 @@ impl Gadget {
             dirty: Cell::new(true),
         };
         res
+    }
+
+    /// Returns the serializable form of this gadget.
+    /// Index instead of reference to definition; no render info
+    /// If the def is not in the list yet, it is added to the list.
+    ///
+    /// `defs` is a list of gadget defs.
+    /// `defs_inv` is an "inverse Vec" of gadget defs.
+    pub fn get_serializable(&self, defs: &mut Vec<Rc<GadgetDef>>, defs_inv: &mut FnvHashMap<*const GadgetDef, usize>) -> GadgetSerde {
+        let index = if let Some(index) = defs_inv.get(&(&*self.def as *const GadgetDef)) {
+            *index
+        } else {
+            defs.push(Rc::clone(&self.def));
+            defs_inv.insert(&*self.def as *const GadgetDef, defs.len());
+            defs_inv.len() - 1
+        };
+
+        GadgetSerde {
+            def: index,
+            size: self.size,
+            port_map: self.port_map.clone(),
+            state: self.state,
+        }
+    }
+
+    pub fn from_serializable(gadget: GadgetSerde, defs: &Vec<Rc<GadgetDef>>) -> Self {
+        Self::new(&defs[gadget.def], gadget.size, gadget.port_map, gadget.state)
     }
 
     pub fn def(&self) -> &Rc<GadgetDef> {
@@ -307,6 +349,58 @@ impl Clone for Gadget {
             render: self.render.clone(),
             dirty: self.dirty.clone(),
         }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GadgetGridSerde {
+    defs: Vec<GadgetDef>,
+    gadgets: Vec<(GadgetSerde, (isize, isize))>,
+}
+
+impl Serialize for Grid<Gadget> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        let mut defs = vec![];
+        let mut defs_inv = FnvHashMap::default();
+        let mut gadgets = vec![];
+
+        for (gadget, xy, wh) in self.iter() {
+            let gadget = gadget.get_serializable(&mut defs, &mut defs_inv);
+            gadgets.push((gadget, (xy.x, xy.y)));
+        }
+
+        let grid_serde = GadgetGridSerde {
+            defs: defs.into_iter().map(|def| (*def).clone()).collect(),
+            gadgets
+        };
+
+        grid_serde.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Grid<Gadget> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let GadgetGridSerde {
+            defs, gadgets
+        } = GadgetGridSerde::deserialize(deserializer)?;
+
+        let defs = defs.into_iter().map(|def| Rc::new(def)).collect();
+
+        let mut grid = Self::new();
+
+        for (gadget, (x, y)) in gadgets.into_iter() {
+            let gadget = Gadget::from_serializable(gadget, &defs);
+            let size = gadget.size;
+            grid.insert(gadget, vec2(x, y), size);
+        }
+        
+        Ok(grid)
     }
 }
 

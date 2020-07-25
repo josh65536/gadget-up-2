@@ -59,27 +59,6 @@ impl App {
     }
 
     pub fn update_ui(&mut self, ui: &mut Ui) {
-        for id in [
-            self.ids.canvas,
-            self.ids.header,
-            self.ids.body,
-            self.ids.left_sidebar,
-            self.ids.rect,
-            self.ids.contraption_screen,
-            self.ids.menu,
-            self.ids.menu_list,
-            self.ids.gadget_select,
-            self.ids.agent,
-        ]
-        .iter()
-        {
-            log!(
-                "Id: {:?}, Capturing: {}",
-                id,
-                ui.widget_input(*id).mouse().is_some()
-            );
-        }
-
         let mut ui = ui.set_widgets();
 
         // Contraption screen
@@ -101,6 +80,8 @@ impl App {
                             self.grid.remove(xy);
                         } else {
                             self.grid.insert(gadget.clone(), xy, gadget.size());
+                            // TODO: Move to a more central place
+                            crate::save_grid_in_url(&self.grid);
                         }
                     }
                 }
