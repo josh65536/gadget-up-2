@@ -2,6 +2,7 @@ use cgmath::vec2;
 use conrod_core::color;
 use conrod_core::position::{Align, Place, Relative};
 use conrod_core::render::PrimitiveWalker;
+use conrod_core::widget::text::{self, Text};
 use conrod_core::widget::Canvas;
 use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, List, Matrix};
 use conrod_core::widget_ids;
@@ -18,7 +19,7 @@ use crate::App;
 
 widget_ids! {
     pub struct WidgetIds {
-        rect, contraption_screen, menu, menu_list, gadget_select, agent,
+        contraption_screen, menu, menu_list, gadget_select, agent, version,
         canvas, header, body, left_sidebar,
     }
 }
@@ -41,7 +42,7 @@ pub enum Mode {
     Play,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn set_mode(&mut self, mode: Mode) {
         if mode != self.mode {
             // clear some fields
@@ -176,7 +177,7 @@ impl App {
                 .outer_padding(5.0)
                 .middle_of(self.ids.left_sidebar)
                 .padded_wh_of(self.ids.left_sidebar, 10.0)
-                .set(self.ids.rect, &mut ui);
+                .set(self.ids.gadget_select, &mut ui);
 
             if let Some(selection) = selection {
                 self.set_mode(Mode::TilePaint);
@@ -186,6 +187,12 @@ impl App {
                 self.gadget_tile = Some(gadget);
             }
         }
+
+        // Version number
+        Text::new("v0.2.0")
+            .font_size(12)
+            .bottom_left_with_margin_on(self.ids.gadget_select, 3.0)
+            .set(self.ids.version, &mut ui);
     }
 
     pub fn render_ui(&mut self, ui: &mut Ui, width: f64, height: f64) {

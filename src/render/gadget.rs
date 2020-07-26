@@ -180,16 +180,19 @@ impl GadgetRenderInfo {
                     vec![
                         Vertex::new(
                             vec3(v0.x as f32, v0.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec3(0.0, 0.0, 0.0),
                             vec4(0.0, 0.0, 0.0, 1.0),
                             [],
                         ),
                         Vertex::new(
                             vec3(end.x as f32, end.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec3(0.0, 0.0, 0.0),
                             vec4(0.0, 0.0, 0.0, 1.0),
                             [],
                         ),
                         Vertex::new(
                             vec3(v2.x as f32, v2.y as f32, GadgetRenderInfo::PATH_Z as f32),
+                            vec3(0.0, 0.0, 0.0),
                             vec4(0.0, 0.0, 0.0, 1.0),
                             [],
                         ),

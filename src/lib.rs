@@ -25,6 +25,7 @@ mod ui;
 mod widget;
 
 use cgmath::{vec2, vec3};
+use conrod_core::text::{font, Font};
 use conrod_core::{Ui, UiBuilder};
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
 use golem::blend::{BlendInput, BlendMode, BlendOperation};
@@ -49,6 +50,7 @@ use grid::Grid;
 use math::Vec2;
 use render::{Camera, GadgetRenderer, Model, UiRenderer};
 use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
+use render::{TextureType, TEXTURES};
 use ui::{Mode, WidgetIds};
 
 #[macro_export]
@@ -79,7 +81,14 @@ macro_rules! elog {
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-pub struct App {
+pub struct Fonts {
+    regular: font::Id,
+    italic: font::Id,
+    bold: font::Id,
+    bold_italic: font::Id,
+}
+
+pub struct App<'a> {
     gl: Rc<Context>,
     camera: Camera,
     center: Vec2,
@@ -96,10 +105,11 @@ pub struct App {
     gadget_select_rep: Gadget,
     mode: Mode,
     ids: WidgetIds,
-    ui_renderer: UiRenderer,
+    ui_renderer: UiRenderer<'a>,
+    fonts: Fonts,
 }
 
-impl App {
+impl<'a> App<'a> {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
 
@@ -145,10 +155,32 @@ impl App {
 
         SHADERS.borrow_mut().init(&gl);
         TRIANGLESES.borrow_mut().init(&());
+        TEXTURES.borrow_mut().init(&gl);
         MODELS.borrow_mut().init(&gl);
 
         let gadget_renderer = GadgetRenderer::new(&gl);
         let ui_renderer = UiRenderer::new(&gl);
+
+        let fonts = Fonts {
+            regular: ui.fonts.insert(
+                Font::from_bytes(&include_bytes!("../assets/fonts/Ubuntu-R.ttf")[..])
+                    .expect("Cannot load regular font"),
+            ),
+            italic: ui.fonts.insert(
+                Font::from_bytes(&include_bytes!("../assets/fonts/Ubuntu-RI.ttf")[..])
+                    .expect("Cannot load italic font"),
+            ),
+            bold: ui.fonts.insert(
+                Font::from_bytes(&include_bytes!("../assets/fonts/Ubuntu-B.ttf")[..])
+                    .expect("Cannot load bold font"),
+            ),
+            bold_italic: ui.fonts.insert(
+                Font::from_bytes(&include_bytes!("../assets/fonts/Ubuntu-BI.ttf")[..])
+                    .expect("Cannot load bold italic font"),
+            ),
+        };
+
+        ui.theme.font_id = Some(fonts.regular);
 
         Self {
             gl,
@@ -166,6 +198,7 @@ impl App {
             mode: Mode::None,
             ids: widget_ids,
             ui_renderer,
+            fonts,
         }
     }
 
@@ -479,6 +512,7 @@ pub fn main_js() -> Result<(), JsValue> {
             } if window_id == window.id() => *ctrl = ControlFlow::Exit,
 
             Event::MainEventsCleared => {
+                // These are in logical size already
                 width = crate::window().inner_width().unwrap().as_f64().unwrap();
                 height = crate::window().inner_height().unwrap().as_f64().unwrap();
 
@@ -496,8 +530,11 @@ pub fn main_js() -> Result<(), JsValue> {
                 app.handle_input(&event);
 
                 if let Some(event) = conrod_winit::v021_convert_event_wh!(
+                    // but the event is in physical coordinates
                     event,
-                    PhysicalSize::new(width, height),
+                    // so convert the size to physical coordinates here
+                    LogicalSize::new(width, height).to_physical::<f64>(window.scale_factor()),
+                    // and pass in the scale factor
                     window.scale_factor()
                 ) {
                     ui.handle_event(event);

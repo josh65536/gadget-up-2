@@ -1,4 +1,4 @@
-use cgmath::{vec3, vec4, Vector3, Vector4};
+use cgmath::{vec2, vec3, vec4, Vector2, Vector3, Vector4};
 use fnv::FnvHashMap;
 use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
@@ -17,15 +17,24 @@ pub type Vertex = VertexEx<[f32; 0]>;
 /// Stores the information for a single vertex.
 #[derive(Clone, Debug)]
 pub struct VertexEx<T: AsRef<[f32]> + Copy> {
+    // Edit the num_floats function if fields are modified!
     pub position: Vector3<f32>,
+    // Z coordinate is 0 for no texture and 1 for texture
+    pub tex_coord: Vector3<f32>,
     pub color: Vector4<f32>,
     pub extra: T,
 }
 
 impl<T: AsRef<[f32]> + Copy> VertexEx<T> {
-    pub fn new(position: Vector3<f32>, color: Vector4<f32>, extra: T) -> Self {
+    pub fn new(
+        position: Vector3<f32>,
+        tex_coord: Vector3<f32>,
+        color: Vector4<f32>,
+        extra: T,
+    ) -> Self {
         Self {
             position,
+            tex_coord,
             color,
             extra,
         }
@@ -36,6 +45,7 @@ impl<T: AsRef<[f32]> + Copy> VertexEx<T> {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = f32> + 'a {
         AsRef::<[f32; 3]>::as_ref(&self.position)
             .iter()
+            .chain(AsRef::<[f32; 3]>::as_ref(&self.tex_coord).iter())
             .chain(AsRef::<[f32; 4]>::as_ref(&self.color).iter())
             .chain(self.extra.as_ref().iter())
             .copied()
@@ -43,7 +53,7 @@ impl<T: AsRef<[f32]> + Copy> VertexEx<T> {
 
     /// Gets the number of f32's this vertex takes
     pub fn num_floats(&self) -> usize {
-        3 + 4 + self.extra.as_ref().len()
+        3 + 3 + 4 + self.extra.as_ref().len()
     }
 }
 
@@ -52,6 +62,7 @@ impl Vertex {
     pub fn with_extra<U: AsRef<[f32]> + Copy>(self, extra: U) -> VertexEx<U> {
         VertexEx {
             position: self.position,
+            tex_coord: self.tex_coord,
             color: self.color,
             extra,
         }
@@ -227,30 +238,30 @@ pub enum TrianglesType {
 
 type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
 
+#[rustfmt::skip]
 fn triangles_map(_: &()) -> TrianglesMap {
     [
         (
             TrianglesType::Agent,
             Rc::new(Triangles::new(
                 vec![
-                    Vertex::new(vec3(0.15, -0.15, 0.0), vec4(0.0, 0.8, 0.0, 1.0), []),
-                    Vertex::new(vec3(0.15, 0.0, 0.0), vec4(0.0, 0.6, 0.0, 1.0), []),
-                    Vertex::new(vec3(0.0, 0.15, 0.0), vec4(0.0, 0.4, 0.0, 1.0), []),
-                    Vertex::new(vec3(-0.15, 0.0, 0.0), vec4(0.0, 0.6, 0.0, 1.0), []),
-                    Vertex::new(vec3(-0.15, -0.15, 0.0), vec4(0.0, 0.8, 0.0, 1.0), []),
+                    Vertex::new(vec3( 0.15, -0.15, 0.), vec3(0., 0., 0.), vec4(0., 0.8, 0., 1.), []),
+                    Vertex::new(vec3( 0.15,  0.,   0.), vec3(0., 0., 0.), vec4(0., 0.6, 0., 1.), []),
+                    Vertex::new(vec3( 0.,    0.15, 0.), vec3(0., 0., 0.), vec4(0., 0.4, 0., 1.), []),
+                    Vertex::new(vec3(-0.15,  0.,   0.), vec3(0., 0., 0.), vec4(0., 0.6, 0., 1.), []),
+                    Vertex::new(vec3(-0.15, -0.15, 0.), vec3(0., 0., 0.), vec4(0., 0.8, 0., 1.), []),
                 ],
                 vec![0, 1, 2, 0, 2, 4, 2, 3, 4],
             )),
         ),
-        //                0.6, 0.8, 1.0, 1.0, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0,
         (
             TrianglesType::GadgetRectangle,
             Rc::new(Triangles::new(
                 vec![
-                    Vertex::new(vec3(0.0, 0.0, 0.0), vec4(0.6, 0.8, 1.0, 1.0), []),
-                    Vertex::new(vec3(1.0, 0.0, 0.0), vec4(0.7, 0.9, 1.0, 1.0), []),
-                    Vertex::new(vec3(1.0, 1.0, 0.0), vec4(0.9, 1.0, 1.0, 1.0), []),
-                    Vertex::new(vec3(0.0, 1.0, 0.0), vec4(0.8, 1.0, 1.0, 1.0), []),
+                    Vertex::new(vec3(0., 0., 0.), vec3(0., 0., 0.), vec4(0.6, 0.8, 1., 1.), []),
+                    Vertex::new(vec3(1., 0., 0.), vec3(0., 0., 0.), vec4(0.7, 0.9, 1., 1.), []),
+                    Vertex::new(vec3(1., 1., 0.), vec3(0., 0., 0.), vec4(0.9, 1.0, 1., 1.), []),
+                    Vertex::new(vec3(0., 1., 0.), vec3(0., 0., 0.), vec4(0.8, 1.0, 1., 1.), []),
                 ],
                 vec![0, 1, 2, 2, 3, 0],
             )),

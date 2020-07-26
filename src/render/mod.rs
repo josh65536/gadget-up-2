@@ -2,6 +2,7 @@ mod camera;
 mod gadget;
 mod model;
 mod shader;
+mod texture;
 mod ui;
 
 pub use camera::Camera;
@@ -9,6 +10,7 @@ pub use gadget::{GadgetRenderInfo, GadgetRenderer, GridItemRenderer};
 pub use model::{Model, Triangles, TrianglesEx, Vertex, VertexEx};
 pub use model::{ModelType, TrianglesType, MODELS, TRIANGLESES};
 pub use shader::{ShaderType, SHADERS};
+pub use texture::{TextureType, TEXTURES};
 pub use ui::UiRenderer;
 
 use crate::gadget::Gadget;

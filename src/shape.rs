@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{vec3, Vector3, Vector4};
+use cgmath::{vec2, vec3, Vector3, Vector4};
 use itertools::izip;
 
 use crate::math::TAUf64;
@@ -19,7 +19,7 @@ pub trait Shape {
         Triangles::new(
             self.positions()
                 .into_iter()
-                .map(|p| Vertex::new(p, color, []))
+                .map(|p| Vertex::new(p, vec3(0.0, 0.0, 0.0), color, []))
                 .collect(),
             self.indexes(),
         )
