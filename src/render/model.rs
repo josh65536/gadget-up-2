@@ -239,7 +239,7 @@ pub enum TrianglesType {
 type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
 
 #[rustfmt::skip]
-fn triangles_map(_: &()) -> TrianglesMap {
+fn triangles_map(_: ()) -> TrianglesMap {
     [
         (
             TrianglesType::Agent,
@@ -273,7 +273,7 @@ fn triangles_map(_: &()) -> TrianglesMap {
 }
 
 ref_thread_local!(
-    pub static managed TRIANGLESES: StaticMap<TrianglesType, Rc<Triangles>, fn(&()) -> TrianglesMap, ()> = StaticMap::new(
+    pub static managed TRIANGLESES: StaticMap<TrianglesType, Rc<Triangles>, fn(()) -> TrianglesMap, ()> = StaticMap::new(
         triangles_map
     );
 );
@@ -287,7 +287,7 @@ pub enum ModelType {
 type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
 
 ref_thread_local!(
-    pub static managed MODELS: StaticMap<ModelType, Rc<Model>, fn(&Context) -> ModelMap, Context> = StaticMap::new(
+    pub static managed MODELS: StaticMap<ModelType, Rc<Model>, fn(&Context) -> ModelMap, &'static Context> = StaticMap::new(
         model_map
     );
 );

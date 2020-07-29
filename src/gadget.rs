@@ -158,6 +158,7 @@ pub struct GadgetSerde {
 }
 
 pub struct Gadget {
+    name: String,
     def: Rc<GadgetDef>,
     size: WH,
     /// Ports are located at midpoints of unit segments along the perimeter,
@@ -178,6 +179,7 @@ impl Gadget {
     /// The port map maps each port to its position index along the perimeter.
     pub fn new(def: &Rc<GadgetDef>, size: WH, port_map: Vec<usize>, state: State) -> Self {
         let res = Self {
+            name: String::new(),
             def: Rc::clone(def),
             size,
             port_map,
@@ -186,6 +188,17 @@ impl Gadget {
             dirty: Cell::new(true),
         };
         res
+    }
+
+    /// Gives this gadget a name and returns it back
+    pub fn name_this(mut self, name: &str) -> Self {
+        self.name = name.to_string();
+        self
+    }
+
+    /// Gets the gadget's name
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// Returns the serializable form of this gadget.
@@ -386,6 +399,7 @@ impl Gadget {
 impl Clone for Gadget {
     fn clone(&self) -> Self {
         Self {
+            name: self.name.clone(),
             def: Rc::clone(&self.def),
             size: self.size,
             port_map: self.port_map.clone(),
@@ -568,12 +582,18 @@ impl Agent {
         self.direction = -self.direction
     }
 
-    /// Advances the agent according to internal rules
-    pub fn advance(&mut self, grid: &mut Grid<Gadget>, input: Vec2i) {
+    /// Advances the agent according to internal rules.
+    /// Returns a reference to the gadget, its position, and its previous state
+    /// if a gadget changed state as a result.
+    pub fn advance<'a>(
+        &mut self,
+        grid: &'a mut Grid<Gadget>,
+        input: Vec2i,
+    ) -> Option<(&'a Gadget, XY, State)> {
         if input.dot_ex(self.direction) == -1 {
             // Turn around, that's it
             self.direction *= -1;
-            return;
+            return None;
         }
 
         if let Some((gadget, xy, (_w, _h), idx)) =
@@ -628,10 +648,15 @@ impl Agent {
                     };
 
                     self.double_xy = xy * 2 + pos2;
+                    let state = gadget.state();
                     gadget.set_state(*s1);
+
+                    return Some((gadget, xy, state));
                 }
             }
         }
+
+        None
     }
 }
 

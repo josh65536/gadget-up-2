@@ -16,6 +16,7 @@ use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MO
 use crate::render::{SHADERS, TRIANGLESES};
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
+use crate::UndoAction;
 
 widget_ids! {
     pub struct WidgetIds {
@@ -51,6 +52,30 @@ impl<'a> App<'a> {
                 self.gadget_tile = None;
             }
 
+            // Play time! Use the playing undo stack
+            if mode == Mode::Play {
+                self.undo_stack_index = 1;
+                self.undo_stack_mut().clear();
+            }
+
+            // Play time's over! Move the entire play history to the main stack as a single batch
+            if self.mode == Mode::Play {
+                self.undo_stack_index = 0;
+
+                let (main_stack, play_stack) = self.undo_stacks.split_at_mut(1);
+                let main_stack = &mut main_stack[0];
+                let play_stack = &mut play_stack[0];
+
+                main_stack
+                    .as_mut()
+                    .expect("Tried to get undo stack while undoing/redoing")
+                    .append_as_batch(
+                        play_stack
+                            .as_mut()
+                            .expect("Tried to get undo stack while undoing/redoing"),
+                    );
+            }
+
             if mode != Mode::AgentPlace && mode != Mode::Play {
                 self.agent = None;
             }
@@ -78,10 +103,23 @@ impl<'a> App<'a> {
                             && gadget.def().num_ports() == 0
                             && gadget.size() == (1, 1)
                         {
-                            self.grid.remove(xy);
+                            if let Some((gadget, xy, _)) = self.grid.remove(xy) {
+                                self.undo_stack_mut().push(UndoAction::GadgetRemove {
+                                    gadget,
+                                    position: xy,
+                                });
+                            }
                         } else {
-                            self.grid.insert(gadget.clone(), xy, gadget.size());
-                            // TODO: Move to a more central place
+                            let removed = self.grid.insert(gadget.clone(), xy, gadget.size());
+                            for (gadget, xy, _) in removed.into_iter() {
+                                self.undo_stack_mut().push(UndoAction::GadgetRemove {
+                                    gadget,
+                                    position: xy,
+                                });
+                            }
+
+                            self.undo_stack_mut()
+                                .push(UndoAction::GadgetInsert { position: xy });
                         }
                         crate::save_grid_in_url(&self.grid);
                     }
@@ -89,6 +127,10 @@ impl<'a> App<'a> {
 
                 screen::Event::TileHover(xy) => {
                     self.gadget_tile_xy = xy;
+                }
+
+                screen::Event::TilePaintFinish => {
+                    self.undo_stack_mut().batch();
                 }
 
                 screen::Event::AgentPlace(xy) => {
@@ -200,7 +242,7 @@ impl<'a> App<'a> {
 
         let mut primitives = ui.draw();
         while let Some(primitive) = PrimitiveWalker::next_primitive(&mut primitives) {
-            self.ui_renderer.primitive(primitive);
+            self.ui_renderer.primitive(primitive, ui);
         }
 
         self.ui_renderer.draw_end();

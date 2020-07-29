@@ -6,7 +6,7 @@ use crate::spsp_multi;
 pub fn preset_gadgets() -> Vec<Gadget> {
     let def = Rc::new(GadgetDef::new(1, 0));
 
-    let nope = Gadget::new(&def, (1, 1), vec![], State(0));
+    let nope = Gadget::new(&def, (1, 1), vec![], State(0)).name_this("Nope");
 
     let mut def = Rc::new(GadgetDef::from_traversals(
         1,
@@ -14,9 +14,9 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (0, 1)), ((0, 1), (0, 0))],
     ));
 
-    let straight = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+    let straight = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Straight");
 
-    let turn = Gadget::new(&def, (1, 1), vec![0, 1], State(0));
+    let turn = Gadget::new(&def, (1, 1), vec![0, 1], State(0)).name_this("Turn");
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
@@ -29,9 +29,9 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let cross = Gadget::new(&def, (1, 1), vec![0, 2, 1, 3], State(0));
+    let cross = Gadget::new(&def, (1, 1), vec![0, 2, 1, 3], State(0)).name_this("Cross");
 
-    let turn2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let turn2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("2 turns");
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
@@ -46,7 +46,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let way3 = Gadget::new(&def, (1, 1), vec![0, 1, 3], State(0));
+    let way3 = Gadget::new(&def, (1, 1), vec![0, 1, 3], State(0)).name_this("3-way");
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
@@ -67,7 +67,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let way4 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let way4 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("4-way");
 
     def = Rc::new(GadgetDef::from_traversals(
         1,
@@ -75,7 +75,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (0, 1))],
     ));
 
-    let diode = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+    let diode = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Diode");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -83,7 +83,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1)), ((1, 1), (0, 0))],
     ));
 
-    let toggle = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+    let toggle = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Toggle");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -91,7 +91,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1))],
     ));
 
-    let dicrumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+    let dicrumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Directed crumbler");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -99,7 +99,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1)), ((0, 1), (1, 0))],
     ));
 
-    let crumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0));
+    let crumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Crumbler");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -107,7 +107,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 0)), ((1, 1), (0, 2))],
     ));
 
-    let scd = Gadget::new(&def, (1, 1), vec![0, 3, 1], State(0));
+    let scd = Gadget::new(&def, (1, 1), vec![0, 3, 1], State(0)).name_this("Self-closing door");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -120,7 +120,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let toggle2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let toggle2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("2-toggle");
 
     def = Rc::new(GadgetDef::from_traversals(
         3,
@@ -133,7 +133,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let lock_toggle_2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let lock_toggle_2 =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Locking 2-toggle");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -141,7 +142,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1)), ((1, 2), (0, 3))],
     ));
 
-    let mismatched_dicrumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let mismatched_dicrumbler =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Mismatched dicrumblers");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -154,7 +156,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let mismatched_crumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let mismatched_crumbler =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Mismatched crumblers");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -162,7 +165,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         spsp_multi![((0, 0), (1, 1)), ((0, 2), (1, 3))],
     ));
 
-    let matched_dicrumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let matched_dicrumbler =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Matched dicrumblers");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -175,7 +179,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let matched_crumbler = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let matched_crumbler =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Matched crumblers");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -188,7 +193,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let toggle_lock = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let toggle_lock =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Toggle lock");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -203,7 +209,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwire_lock = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let tripwire_lock =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Tripwire lock");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -218,7 +225,8 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let tripwire_toggle = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0));
+    let tripwire_toggle =
+        Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Tripwire toggle");
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -232,7 +240,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         ],
     ));
 
-    let door = Gadget::new(&def, (2, 1), vec![4, 5, 1, 2, 0, 3], State(0));
+    let door = Gadget::new(&def, (2, 1), vec![4, 5, 1, 2, 0, 3], State(0)).name_this("Door");
 
     vec![
         nope,

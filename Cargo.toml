@@ -2,7 +2,7 @@
 [package]
 name = "gadget-up-2"
 description = "Tile-based implementation of gadgets"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Joshua Ani <josh4820@gmail.com>"]
 categories = ["wasm"]
 readme = "README.md"

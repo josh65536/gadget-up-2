@@ -128,14 +128,16 @@ impl<T> Grid<T> {
     }
 
     /// Inserts an item at a specific minimal XY position with a specific size.
-    /// Removes overlapping items.
-    pub fn insert(&mut self, t: T, position: XY, size: WH) {
+    /// Removes and returns overlapping items.
+    pub fn insert(&mut self, t: T, position: XY, size: WH) -> Vec<(T, XY, WH)> {
         let (x, y) = (position.x, position.y);
         let (w, h) = size;
 
+        let mut overlapping = vec![];
+
         for y in y..(y + h as isize) {
             for x in x..(x + w as isize) {
-                self.remove(vec2(x, y));
+                overlapping.extend(self.remove(vec2(x, y)));
             }
         }
 
@@ -149,18 +151,24 @@ impl<T> Grid<T> {
                 self.grid.insert(vec2(x, y), idx);
             }
         }
+
+        overlapping
     }
 
-    /// Removes the item at a specific position
-    pub fn remove(&mut self, position: XY) {
+    /// Removes and returns the item at a specific position
+    pub fn remove(&mut self, position: XY) -> Option<(T, XY, WH)> {
         if let Some(idx) = self.grid.get(&position) {
-            let (_t, xy, (w, h)) = self.items.remove(idx).unwrap();
+            let (t, xy, (w, h)) = self.items.remove(idx).unwrap();
 
             for y in xy.y..(xy.y + h as isize) {
                 for x in xy.x..(xy.x + w as isize) {
                     self.grid.remove(&vec2(x, y));
                 }
             }
+
+            Some((t, xy, (w, h)))
+        } else {
+            None
         }
     }
 }

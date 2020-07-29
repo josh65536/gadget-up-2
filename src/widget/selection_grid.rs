@@ -145,7 +145,9 @@ impl<'a> Widget for SelectionGrid<'a> {
                 //    event = Some(name.to_owned());
                 //}
 
-                let button = Button::triangles(Triangles3d::from_gadget(gadget)).padding(5.0);
+                let button = Button::triangles(Triangles3d::from_gadget(gadget))
+                    .padding(5.0)
+                    .tooltip_text(gadget.name());
 
                 for _ in element.set(button, ui) {
                     event = Some(i);
@@ -159,7 +161,7 @@ impl<'a> Widget for SelectionGrid<'a> {
                             .color(Color::Rgba(0.5, 0.0, 0.0, 1.0)),
                     )
                     .x_y_relative_to(state.matrix, element.rel_x, element.rel_y)
-                    .graphics_for(state.matrix)
+                    .graphics_for(element.widget_id)
                     .set(state.select_rect, ui);
                 }
             }

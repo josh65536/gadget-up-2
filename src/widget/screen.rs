@@ -163,6 +163,10 @@ impl<'a> ContraptionScreen<'a> {
                     events.push(Event::TileHover(vec2(x, y)));
                 }
             }
+
+            if state.released.is_left() {
+                events.push(Event::TilePaintFinish);
+            }
         });
 
         events
@@ -214,6 +218,8 @@ pub enum Event {
     TilePaint(XY),
     /// Mouse moved over (X, Y) in tile paint mode
     TileHover(XY),
+    /// Tile painting is done
+    TilePaintFinish,
     /// Agent is placed at (X, Y)
     AgentPlace(Vec2),
     /// Mouse moved over (X, Y) in agent place mode

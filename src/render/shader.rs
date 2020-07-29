@@ -22,7 +22,7 @@ pub enum ShaderType {
 type ShaderMap = FnvHashMap<ShaderType, Rc<ShaderProgram>>;
 
 ref_thread_local!(
-    pub static managed SHADERS: StaticMap<ShaderType, Rc<ShaderProgram>, fn(&Context) -> ShaderMap, Context> = StaticMap::new(
+    pub static managed SHADERS: StaticMap<ShaderType, Rc<ShaderProgram>, fn(&Context) -> ShaderMap, &'static Context> = StaticMap::new(
         shader_map
     );
 );

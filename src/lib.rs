@@ -34,19 +34,20 @@ use golem::Context;
 use golem::ShaderProgram;
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet};
 use ref_thread_local::RefThreadLocal;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
-use winit::event::MouseScrollDelta;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{ModifiersState, MouseScrollDelta};
 use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 use winit::window::WindowBuilder;
 
 use gadget::{Agent, Gadget, GadgetDef, State};
-use grid::Grid;
+use grid::{Grid, XY};
 use math::Vec2;
 use render::{Camera, GadgetRenderer, Model, UiRenderer};
 use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
@@ -88,6 +89,165 @@ pub struct Fonts {
     bold_italic: font::Id,
 }
 
+/// An undoable action.
+/// Stores the information needed to undo the action.
+pub enum UndoAction {
+    GadgetInsert { position: XY },
+    GadgetRemove { gadget: Gadget, position: XY },
+    AgentMove { position: Vec2, direction: XY },
+    GadgetChangeState { position: XY, state: State },
+    Batch(Vec<UndoAction>),
+}
+
+// To allow std::mem::take to work
+impl Default for UndoAction {
+    fn default() -> Self {
+        UndoAction::Batch(vec![])
+    }
+}
+
+pub struct UndoStack {
+    undo: Vec<UndoAction>,
+    redo: Vec<UndoAction>,
+}
+
+/// An undo stack.
+/// Invariant: If an action is batched, so are the ones that come before it.
+impl UndoStack {
+    pub fn new() -> Self {
+        Self {
+            undo: vec![],
+            redo: vec![],
+        }
+    }
+
+    /// Undoes a single action and returns the inverse of that action,
+    /// if the original action is still valid
+    fn undo_action(&mut self, app: &mut App, action: UndoAction) -> Option<UndoAction> {
+        match action {
+            UndoAction::GadgetInsert { position } => {
+                let (gadget, xy, _) = app
+                    .grid
+                    .remove(position)
+                    .expect("A GadgetInsert action was inserted when no gadget was inserted");
+                Some(UndoAction::GadgetRemove {
+                    gadget,
+                    position: xy,
+                })
+            }
+
+            UndoAction::GadgetRemove { gadget, position } => {
+                let size = gadget.size();
+                app.grid.insert(gadget, position, size);
+                Some(UndoAction::GadgetInsert { position })
+            }
+
+            UndoAction::AgentMove {
+                position,
+                direction,
+            } => {
+                if let Some(agent) = app.agent.as_mut() {
+                    let old_position = agent.position();
+                    let old_direction = agent.direction();
+
+                    agent.set_position(position);
+                    // Note that set_position also makes sure the direction is valid for that position
+                    if agent.direction() != direction {
+                        agent.flip();
+                    }
+
+                    Some(UndoAction::AgentMove {
+                        position: old_position,
+                        direction: old_direction,
+                    })
+                } else {
+                    // We are no longer in play mode, so this action should get removed
+                    None
+                }
+            }
+
+            UndoAction::GadgetChangeState { position, state } => {
+                let (gadget, _, _) = app
+                    .grid
+                    .get_mut(position)
+                    .expect("GadgetChangeState requires the gadget to be there");
+                let old_state = gadget.state();
+                gadget.set_state(state);
+                Some(UndoAction::GadgetChangeState {
+                    position,
+                    state: old_state,
+                })
+            }
+
+            UndoAction::Batch(mut actions) => {
+                let mut rev_actions = vec![];
+
+                for action in actions.into_iter().rev() {
+                    rev_actions.extend(self.undo_action(app, action));
+                }
+
+                Some(UndoAction::Batch(rev_actions))
+            }
+        }
+    }
+
+    pub fn undo(&mut self, app: &mut App) {
+        // Just in case there were unbatched actions at the top of the stack
+        self.batch();
+
+        if let Some(action) = self.undo.pop() {
+            let action = self.undo_action(app, action);
+            self.redo.extend(action);
+        }
+    }
+
+    pub fn redo(&mut self, app: &mut App) {
+        // Must preserve the invariant!
+        self.batch();
+
+        if let Some(action) = self.redo.pop() {
+            let action = self.undo_action(app, action);
+            self.undo.extend(action);
+        }
+    }
+
+    /// Adds an action to the undo stack, clearing the redo stack
+    pub fn push(&mut self, action: UndoAction) {
+        self.redo.clear();
+        self.undo.push(action);
+    }
+
+    /// Ends the current list of undo actions, making it a batch,
+    /// if there are any unbatched actions at the top
+    pub fn batch(&mut self) {
+        // Take advantage of the invariant
+        if let Some(first_unbatched) = self.undo.iter().position(|action| {
+            if let UndoAction::Batch(_) = action {
+                false
+            } else {
+                true
+            }
+        }) {
+            let vec = self.undo.drain(first_unbatched..).collect::<Vec<_>>();
+            self.undo.push(UndoAction::Batch(vec));
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.undo.clear();
+        self.redo.clear();
+    }
+
+    /// Batch all the actions in `other` and push that batch onto this stack
+    pub fn append_as_batch(&mut self, other: &mut UndoStack) {
+        let vec = std::mem::take(&mut other.undo);
+
+        if vec.len() > 0 {
+            self.push(UndoAction::Batch(vec));
+        }
+    }
+}
+
 pub struct App<'a> {
     gl: Rc<Context>,
     camera: Camera,
@@ -107,6 +267,10 @@ pub struct App<'a> {
     ids: WidgetIds,
     ui_renderer: UiRenderer<'a>,
     fonts: Fonts,
+    // One for editing, and one for playing
+    undo_stacks: [Option<UndoStack>; 2],
+    undo_stack_index: usize,
+    modifiers: ModifiersState,
 }
 
 impl<'a> App<'a> {
@@ -154,7 +318,7 @@ impl<'a> App<'a> {
         let widget_ids = WidgetIds::new(ui.widget_id_generator());
 
         SHADERS.borrow_mut().init(&gl);
-        TRIANGLESES.borrow_mut().init(&());
+        TRIANGLESES.borrow_mut().init(());
         TEXTURES.borrow_mut().init(&gl);
         MODELS.borrow_mut().init(&gl);
 
@@ -199,7 +363,23 @@ impl<'a> App<'a> {
             ids: widget_ids,
             ui_renderer,
             fonts,
+            undo_stacks: [Some(UndoStack::new()), Some(UndoStack::new())],
+            undo_stack_index: 0,
+            modifiers: ModifiersState::default(),
         }
+    }
+
+    // Convenience functions that assume the logic is correct
+    pub fn undo_stack_mut(&mut self) -> &mut UndoStack {
+        self.undo_stacks[self.undo_stack_index]
+            .as_mut()
+            .expect("Tried to get undo stack while undoing/redoing")
+    }
+
+    pub fn undo_stack_take(&mut self) -> UndoStack {
+        self.undo_stacks[self.undo_stack_index]
+            .take()
+            .expect("Tride to take undo stack while undoing/redoing")
     }
 
     pub fn update(&mut self, ui: &mut Ui) {
@@ -259,6 +439,14 @@ impl<'a> App<'a> {
                     .min(Self::HEIGHT_MAX)
             }
 
+            //TODO: Implement the event in winit for the web
+            //Event::WindowEvent {
+            //    event: WindowEvent::ModifiersChanged(state),
+            //    ..
+            //} => {
+            //    self.modifiers = *state;
+            //    log!("Modifiers: {:?}", self.modifiers);
+            //}
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
@@ -266,67 +454,119 @@ impl<'a> App<'a> {
                             KeyboardInput {
                                 virtual_keycode: Some(keycode),
                                 state,
+                                modifiers,
                                 ..
                             },
                         ..
                     },
                 ..
             } => {
-                match keycode {
-                    VirtualKeyCode::R | VirtualKeyCode::T => {
-                        if let ElementState::Pressed = state {
-                            if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.rotate(if *keycode == VirtualKeyCode::R { 1 } else { -1 });
+                if modifiers.ctrl() {
+                    if let ElementState::Pressed = state {
+                        match keycode {
+                            VirtualKeyCode::Z => {
+                                let mut stack = self.undo_stack_take();
+                                stack.undo(self);
+                                self.undo_stacks[self.undo_stack_index] = Some(stack);
                             }
 
-                            if self.mode == Mode::AgentPlace {
-                                if let Some(agent) = &mut self.agent {
-                                    agent.flip();
+                            VirtualKeyCode::Y => {
+                                let mut stack = self.undo_stack_take();
+                                stack.redo(self);
+                                self.undo_stacks[self.undo_stack_index] = Some(stack);
+                            }
+
+                            _ => {}
+                        }
+                    }
+                } else {
+                    match keycode {
+                        VirtualKeyCode::R | VirtualKeyCode::T => {
+                            if let ElementState::Pressed = state {
+                                if let Some(gadget) = &mut self.gadget_tile {
+                                    gadget.rotate(if *keycode == VirtualKeyCode::R {
+                                        1
+                                    } else {
+                                        -1
+                                    });
+                                }
+
+                                if self.mode == Mode::AgentPlace {
+                                    if let Some(agent) = &mut self.agent {
+                                        agent.flip();
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    VirtualKeyCode::X => {
-                        if let ElementState::Pressed = state {
-                            if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.flip_ports_x();
+                        VirtualKeyCode::X => {
+                            if let ElementState::Pressed = state {
+                                if let Some(gadget) = &mut self.gadget_tile {
+                                    gadget.flip_ports_x();
+                                }
                             }
                         }
-                    }
 
-                    VirtualKeyCode::Y => {
-                        if let ElementState::Pressed = state {
-                            if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.flip_ports_y();
+                        VirtualKeyCode::Y => {
+                            if let ElementState::Pressed = state {
+                                if let Some(gadget) = &mut self.gadget_tile {
+                                    gadget.flip_ports_y();
+                                }
                             }
                         }
-                    }
 
-                    VirtualKeyCode::C => {
-                        if let ElementState::Pressed = state {
-                            if let Some(gadget) = &mut self.gadget_tile {
-                                gadget.cycle_state();
+                        VirtualKeyCode::C => {
+                            if let ElementState::Pressed = state {
+                                if let Some(gadget) = &mut self.gadget_tile {
+                                    gadget.cycle_state();
+                                }
                             }
                         }
+
+                        _ => {}
                     }
 
-                    _ => {}
-                }
+                    if self.mode == Mode::Play {
+                        if let ElementState::Pressed = state {
+                            let dir = match keycode {
+                                VirtualKeyCode::W | VirtualKeyCode::Up => Some(vec2(0, 1)),
+                                VirtualKeyCode::A | VirtualKeyCode::Left => Some(vec2(-1, 0)),
+                                VirtualKeyCode::S | VirtualKeyCode::Down => Some(vec2(0, -1)),
+                                VirtualKeyCode::D | VirtualKeyCode::Right => Some(vec2(1, 0)),
+                                _ => None,
+                            };
 
-                if self.mode == Mode::Play {
-                    if let ElementState::Pressed = state {
-                        let dir = match keycode {
-                            VirtualKeyCode::W | VirtualKeyCode::Up => Some(vec2(0, 1)),
-                            VirtualKeyCode::A | VirtualKeyCode::Left => Some(vec2(-1, 0)),
-                            VirtualKeyCode::S | VirtualKeyCode::Down => Some(vec2(0, -1)),
-                            VirtualKeyCode::D | VirtualKeyCode::Right => Some(vec2(1, 0)),
-                            _ => None,
-                        };
+                            if let Some(dir) = dir {
+                                let agent = self.agent.as_mut().unwrap();
+                                // Borrowing rules require that self.undo_stack is obtained directly
+                                let undo_stack = self.undo_stacks[self.undo_stack_index]
+                                    .as_mut()
+                                    .expect("Tried to get undo stack while undoing/redoing");
+                                let prev_position = agent.position();
+                                let prev_direction = agent.direction();
 
-                        if let Some(dir) = dir {
-                            self.agent.as_mut().unwrap().advance(&mut self.grid, dir);
-                            save_grid_in_url(&self.grid);
+                                let result = agent.advance(&mut self.grid, dir);
+
+                                if agent.position() != prev_position
+                                    || agent.direction() != prev_direction
+                                {
+                                    undo_stack.push(UndoAction::AgentMove {
+                                        position: prev_position,
+                                        direction: prev_direction,
+                                    })
+                                }
+
+                                if let Some((_, xy, state)) = result {
+                                    undo_stack.push(UndoAction::GadgetChangeState {
+                                        position: xy,
+                                        state,
+                                    });
+                                }
+
+                                undo_stack.batch();
+
+                                save_grid_in_url(&self.grid);
+                            }
                         }
                     }
                 }

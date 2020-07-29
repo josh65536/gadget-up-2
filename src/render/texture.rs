@@ -12,7 +12,7 @@ pub enum TextureType {
 type TextureMap = FnvHashMap<TextureType, Texture>;
 
 ref_thread_local!(
-    pub static managed TEXTURES: StaticMap<TextureType, Texture, fn(&Context) -> TextureMap, Context> = StaticMap::new(
+    pub static managed TEXTURES: StaticMap<TextureType, Texture, fn(&Context) -> TextureMap, &'static Context> = StaticMap::new(
         texture_map
     );
 );

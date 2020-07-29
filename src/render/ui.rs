@@ -1,8 +1,9 @@
 use cgmath::{vec2, vec3, vec4};
+use conrod_core::graph::Node;
 use conrod_core::render::{Primitive, PrimitiveKind};
 use conrod_core::text::GlyphCache;
 use conrod_core::utils;
-use conrod_core::Widget;
+use conrod_core::{Ui, Widget};
 use golem::Dimension::{D3, D4};
 use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
 use golem::{ColorFormat, Context, ShaderDescription, ShaderProgram};
@@ -30,6 +31,7 @@ pub struct UiRenderer<'a> {
     index_buffer: ElementBuffer,
     width: f64,
     height: f64,
+    floating: bool,
 }
 
 impl<'a> UiRenderer<'a> {
@@ -57,7 +59,8 @@ impl<'a> UiRenderer<'a> {
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
             width: 1.0,
-            height: 1.0
+            height: 1.0,
+            floating: false,
         }
     }
 
@@ -67,6 +70,7 @@ impl<'a> UiRenderer<'a> {
         self.camera.set_orthographic_projection(width, height, 1.0);
         self.width = width;
         self.height = height;
+        self.floating = false;
     }
 
     /// Finishes the drawing process
@@ -102,12 +106,23 @@ impl<'a> UiRenderer<'a> {
         }
     }
 
-    pub fn primitive(&mut self, p: Primitive) {
-        let Primitive {
-            id: _, kind, rect, ..
-        } = p;
+    pub fn primitive(&mut self, p: Primitive, ui: &Ui) {
+        let Primitive { id, kind, rect, .. } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
+
+        let mut z = Self::UI_Z_BASE as f32 + if self.floating { -0.01 } else { 0.0 };
+
+        // Because the model widgets render with different depth,
+        // add a hack here for floating widgets.
+        //if let Some(Node::Widget(widget)) = ui.widget_graph().node(id) {
+        //    log!("This is");
+        //    if widget.maybe_floating.is_some() {
+        //        log!("a floating widget!");
+        //        z -= 0.01;
+        //        log!("Kind: {:?}", std::mem::discriminant(&kind));
+        //    }
+        //}
 
         match kind {
             PrimitiveKind::Rectangle { color } => {
@@ -116,7 +131,7 @@ impl<'a> UiRenderer<'a> {
                 self.triangles.append(
                     Rectangle::new(-w / 2.0, w / 2.0, -h / 2.0, h / 2.0, 0.0)
                         .triangles(vec4(rgba.0, rgba.1, rgba.2, rgba.3))
-                        .with_extra([1.0, 1.0, x as f32, y as f32, UiRenderer::UI_Z_BASE as f32]),
+                        .with_extra([1.0, 1.0, x as f32, y as f32, z]),
                 );
             }
 
@@ -133,31 +148,19 @@ impl<'a> UiRenderer<'a> {
                         .flat_map(|t| {
                             vec![
                                 VertexEx::new(
-                                    vec3(
-                                        t[0][0] as f32,
-                                        t[0][1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[0][0] as f32, t[0][1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     color,
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        t[1][0] as f32,
-                                        t[1][1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[1][0] as f32, t[1][1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     color,
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        t[2][0] as f32,
-                                        t[2][1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[2][0] as f32, t[2][1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     color,
                                     extra,
@@ -179,31 +182,19 @@ impl<'a> UiRenderer<'a> {
                         .flat_map(|t| {
                             vec![
                                 VertexEx::new(
-                                    vec3(
-                                        t[0].0[0] as f32,
-                                        t[0].0[1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[0].0[0] as f32, t[0].0[1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        t[1].0[0] as f32,
-                                        t[1].0[1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[1].0[0] as f32, t[1].0[1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        t[2].0[0] as f32,
-                                        t[2].0[1] as f32,
-                                        UiRenderer::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(t[2].0[0] as f32, t[2].0[1] as f32, z),
                                     vec3(0.0, 0.0, 0.0),
                                     vec4(t[0].1 .0, t[0].1 .1, t[0].1 .2, t[0].1 .3),
                                     extra,
@@ -229,7 +220,6 @@ impl<'a> UiRenderer<'a> {
                 text,
                 font_id,
             } => {
-                // TODO: Make sure this works on devices where the scale factor isn't 1
                 let glyphs = text.positioned_glyphs(1.0);
 
                 for glyph in glyphs.iter() {
@@ -264,7 +254,13 @@ impl<'a> UiRenderer<'a> {
                 let rgba = color.to_rgb();
                 let color = vec4(rgba.0, rgba.1, rgba.2, rgba.3);
 
-                let extra = [1.0, -1.0, -self.width as f32 / 2.0, self.height as f32 / 2.0, 0.0];
+                let extra = [
+                    1.0,
+                    -1.0,
+                    -self.width as f32 / 2.0,
+                    self.height as f32 / 2.0,
+                    0.0,
+                ];
 
                 for glyph in glyphs {
                     if let Ok(Some((uv_rect, pos))) =
@@ -278,41 +274,25 @@ impl<'a> UiRenderer<'a> {
                         self.triangles.append(TrianglesEx::new(
                             vec![
                                 VertexEx::new(
-                                    vec3(
-                                        pos.min.x as f32,
-                                        pos.min.y as f32,
-                                        Self::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(pos.min.x as f32, pos.min.y as f32, z),
                                     vec3(tx_min, ty_min, 1.0),
                                     color,
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        pos.max.x as f32,
-                                        pos.min.y as f32,
-                                        Self::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(pos.max.x as f32, pos.min.y as f32, z),
                                     vec3(tx_max, ty_min, 1.0),
                                     color,
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        pos.max.x as f32,
-                                        pos.max.y as f32,
-                                        Self::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(pos.max.x as f32, pos.max.y as f32, z),
                                     vec3(tx_max, ty_max, 1.0),
                                     color,
                                     extra,
                                 ),
                                 VertexEx::new(
-                                    vec3(
-                                        pos.min.x as f32,
-                                        pos.max.y as f32,
-                                        Self::UI_Z_BASE as f32,
-                                    ),
+                                    vec3(pos.min.x as f32, pos.max.y as f32, z),
                                     vec3(tx_min, ty_max, 1.0),
                                     color,
                                     extra,
@@ -325,6 +305,12 @@ impl<'a> UiRenderer<'a> {
             }
 
             PrimitiveKind::Other(widget) => {
+                // Floating widgets render after normal ones.
+                // Hack here to move them closer to the camera because of 3D models in the UI
+                if widget.maybe_floating.is_some() {
+                    self.floating = true;
+                }
+
                 if widget.type_id == std::any::TypeId::of::<<Triangles3d as Widget>::State>() {
                     if let Some(ss) = widget.unique_widget_state::<Triangles3d>() {
                         ss.state.render(self);
