@@ -3,7 +3,7 @@ use super::{Model, ModelType, Triangles, Vertex, MODELS};
 use crate::gadget::{Agent, Gadget, PP};
 use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::math::{Mat4, Vec2, Vector2Ex};
+use crate::math::{Mat4, Vec2, Vector2Ex, Vec2i};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 use cgmath::{vec2, vec3, vec4};
@@ -232,8 +232,12 @@ pub struct GadgetRenderer {
     gl: Rc<Context>,
     /// Extra attributes: offset (vec3)
     triangles: TrianglesEx<[f32; 3]>,
+    background: Rc<Model>,
     vertex_buffer: VertexBuffer,
     index_buffer: ElementBuffer,
+    /// For the background
+    instance_buffer: VertexBuffer,
+    instance_positions: Vec<f32>,
 }
 
 impl GadgetRenderer {
@@ -242,8 +246,11 @@ impl GadgetRenderer {
             program: Rc::clone(&SHADERS.borrow()[ShaderType::Offset]),
             gl: Rc::clone(gl),
             triangles: TrianglesEx::default(),
+            background: Rc::clone(&MODELS.borrow()[ModelType::GadgetRectangleInstanced]),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
+            instance_buffer: VertexBuffer::new(gl).unwrap(),
+            instance_positions: vec![],
         }
     }
 
@@ -267,6 +274,7 @@ impl GridItemRenderer for GadgetRenderer {
     /// Start the rendering of the grid
     fn begin(&mut self) {
         self.triangles.clear();
+        self.instance_positions.clear();
     }
 
     /// Render a specific item
@@ -276,12 +284,13 @@ impl GridItemRenderer for GadgetRenderer {
         } else {
             let x = position.x as f32;
             let y = position.y as f32;
+            self.instance_positions.extend_from_slice(&[x, y, GadgetRenderInfo::RECTANGLE_Z as f32]);
 
-            self.triangles.append(
-                (*TRIANGLESES.borrow()[TrianglesType::GadgetRectangle])
-                    .clone()
-                    .with_extra([x, y, GadgetRenderInfo::RECTANGLE_Z as f32]),
-            );
+            //self.triangles.append(
+            //    (*TRIANGLESES.borrow()[TrianglesType::GadgetRectangle])
+            //        .clone()
+            //        .with_extra([x, y, GadgetRenderInfo::RECTANGLE_Z as f32]),
+            //);
         }
     }
 
@@ -300,6 +309,11 @@ impl GridItemRenderer for GadgetRenderer {
         self.vertex_buffer
             .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
         self.index_buffer.set_data(&self.triangles.indexes());
+        self.instance_buffer.set_data(&self.instance_positions);
+
+        // Same program; transform already set
+        self.background.prepare_render_instanced(&self.instance_buffer, &["v_offset"])
+            .render_raw(self.instance_positions.len() as i32 / 3);
 
         unsafe {
             self.program
@@ -311,6 +325,60 @@ impl GridItemRenderer for GadgetRenderer {
                 )
                 .unwrap();
         }
+    }
+}
+
+/// Renders selection marks in the contraption
+pub struct SelectionRenderer {
+    model: Rc<Model>,
+    /// Scale (vec2) and offset (vec3)
+    instance_data: Vec<f32>,
+    instance_buffer: VertexBuffer,
+}
+
+impl SelectionRenderer {
+    pub const Z: f64 = -0.2;
+
+    pub fn new(gl: &Context) -> Self {
+        Self {
+            model: Rc::clone(&MODELS.borrow()[ModelType::SelectionMarkInstanced]),
+            instance_data: vec![],
+            instance_buffer: VertexBuffer::new(gl).unwrap(),
+        }
+    }
+
+    pub fn render<'a>(&mut self, selection: impl IntoIterator<Item = &'a (XY, WH)>, camera: &Camera) {
+        self.instance_data.clear();
+
+        let mut count = 0;
+
+        for (Vec2i { x, y }, (w, h)) in selection.into_iter() {
+            let x = *x;
+            let y = *y;
+            let w = *w as isize;
+            let h = *h as isize;
+
+            #[rustfmt::skip]
+            self.instance_data.extend_from_slice(
+                &[
+                     1.0,  1.0,  x      as f32,  y      as f32, Self::Z as f32,
+                    -1.0,  1.0, (x + w) as f32,  y      as f32, Self::Z as f32,
+                    -1.0, -1.0, (x + w) as f32, (y + h) as f32, Self::Z as f32,
+                     1.0, -1.0,  x      as f32, (y + h) as f32, Self::Z as f32,
+                ]
+            );
+
+            count += 4;
+        }
+
+        if count == 0 {
+            return;
+        }
+
+        self.instance_buffer.set_data(&self.instance_data);
+
+        self.model.prepare_render_instanced(&self.instance_buffer, &["v_scale", "v_offset"])
+            .render_position(vec3(0.0, 0.0, 0.0), camera, count);
     }
 }
 

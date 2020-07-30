@@ -6,15 +6,18 @@ use conrod_core::widget::text::{self, Text};
 use conrod_core::widget::Canvas;
 use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, List, Matrix};
 use conrod_core::widget_ids;
-use conrod_core::Ui;
 use conrod_core::{Borderable, Color, Colorable, Positionable, Sizeable, Theme, Widget};
+use conrod_core::{Ui, UiCell};
 use ref_thread_local::RefThreadLocal;
 
 use crate::gadget::Agent;
 use crate::log;
 use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MODELS};
 use crate::render::{SHADERS, TRIANGLESES};
+use crate::math::Vec2i;
+use crate::widget::button;
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
+use crate::widget::screen::SelectFunc;
 use crate::App;
 use crate::UndoAction;
 
@@ -41,6 +44,7 @@ pub enum Mode {
     TilePaint,
     AgentPlace,
     Play,
+    Select,
 }
 
 impl<'a> App<'a> {
@@ -78,6 +82,10 @@ impl<'a> App<'a> {
 
             if mode != Mode::AgentPlace && mode != Mode::Play {
                 self.agent = None;
+            }
+
+            if mode != Mode::Select {
+                self.selection.clear();
             }
 
             self.mode = mode;
@@ -152,6 +160,30 @@ impl<'a> App<'a> {
                 screen::Event::Pan(xy) => {
                     self.center += xy;
                 }
+
+                screen::Event::Zoom(xy, amount) => {
+                    let prev_height = self.height;
+                    self.height += amount;
+                    self.clamp_height(&ui);
+                    self.center = xy + (self.center - xy) * self.height / prev_height;
+                }
+
+                screen::Event::Select(rect, func) => {
+                    let (l, r, b, t) = rect.l_r_b_t();
+
+                    let selection = self.grid.get_in_bounds(l, r, b, t)
+                        .map(|(_, xy, wh)| (*xy, *wh));
+
+                    match func {
+                        SelectFunc::Replace => self.selection = selection.collect(),
+
+                        SelectFunc::Add => self.selection.extend(selection),
+                        
+                        SelectFunc::Subtract => self.selection = self.selection.difference(&selection.collect()).copied().collect(),
+
+                        SelectFunc::Xor => self.selection = self.selection.symmetric_difference(&selection.collect()).copied().collect(),
+                    }
+                }
             }
         }
 
@@ -178,37 +210,109 @@ impl<'a> App<'a> {
             .wh_of(self.ids.header)
             .set(self.ids.menu, &mut ui);
 
-        let (mut items, _) = List::flow_right(2)
+        let (mut items, _) = List::flow_right(5)
             .middle_of(self.ids.menu)
             .wh_of(self.ids.menu)
             .set(self.ids.menu_list, &mut ui);
 
+        // lifetimes in closures when
+        fn as_menu_button<'a>(
+            button: Button<'a, button::Triangles>,
+            this: &mut App,
+            ui: &mut UiCell,
+        ) -> Button<'a, button::Triangles> {
+            let height = ui.h_of(this.ids.menu_list).expect("No menu list!");
+
+            button.padding(3.0).w(height).h_of(this.ids.menu_list)
+        }
+
         for _ in items.next(&ui).unwrap().set(
-            Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep))
-                .padding(3.0)
-                .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
-                .h_of(self.ids.menu_list),
+            as_menu_button(
+                Button::triangles(Triangles3d::from_gadget(&self.gadget_select_rep)),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Select gadget"),
             &mut ui,
         ) {
             self.set_mode(Mode::TilePaint);
         }
 
         for _ in items.next(&ui).unwrap().set(
-            Button::triangles(Triangles3d::new(
-                (*TRIANGLESES.borrow()[TrianglesType::Agent])
-                    .clone()
-                    .with_default_extra(),
-                vec2(0.0, 0.0),
-                0.3,
-                0.3,
-            ))
-            .padding(3.0)
-            .w(ui.h_of(self.ids.menu_list).expect("No menu list!"))
-            .h_of(self.ids.menu_list),
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Agent])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    0.3,
+                    0.3,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Place agent"),
             &mut ui,
         ) {
             self.set_mode(Mode::AgentPlace);
             self.agent = Some(Agent::new(vec2(0.5, 0.0), vec2(0, 1)));
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Undo])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Undo"),
+            &mut ui,
+        ) {
+            self.undo();
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Undo])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    -2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Redo"),
+            &mut ui,
+        ) {
+            self.redo();
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Select])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Select"),
+            &mut ui,
+        ) {
+            self.set_mode(Mode::Select);
         }
 
         // Gadget selector
@@ -231,7 +335,7 @@ impl<'a> App<'a> {
         }
 
         // Version number
-        Text::new("v0.2.0")
+        Text::new("Gadget Up! 2 v0.3.0")
             .font_size(12)
             .bottom_left_with_margin_on(self.ids.gadget_select, 3.0)
             .set(self.ids.version, &mut ui);

@@ -17,6 +17,8 @@ pub enum ShaderType {
     Offset,
     /// Add a scale (vec2) and an offset (vec3)
     ScaleOffset,
+    /// Add a scale (vec2) and an offset (vec3). This has a texture
+    TexScaleOffset,
 }
 
 type ShaderMap = FnvHashMap<ShaderType, Rc<ShaderProgram>>;
@@ -76,6 +78,34 @@ fn shader_map(gl: &Context) -> ShaderMap {
         ),
         (
             ShaderType::ScaleOffset,
+            Rc::new(ShaderProgram::new(
+                gl,
+                ShaderDescription {
+                    vertex_input: &[
+                        Attribute::new("v_position", AttributeType::Vector(D3)),
+                        Attribute::new("v_tex_coord", AttributeType::Vector(D3)),
+                        Attribute::new("v_color", AttributeType::Vector(D4)),
+                        Attribute::new("v_scale", AttributeType::Vector(D2)),
+                        Attribute::new("v_offset", AttributeType::Vector(D3)),
+                    ],
+                    fragment_input: &[
+                        Attribute::new("f_color", AttributeType::Vector(D4)),
+                    ],
+                    uniforms: &[
+                        Uniform::new("transform", UniformType::Matrix(D4)),
+                    ],
+                    vertex_shader: r#"void main() {
+                        f_color = v_color;
+                        gl_Position = transform * vec4(v_position * vec3(v_scale, 1.0) + v_offset, 1.0);
+                    }"#,
+                    fragment_shader: r#"void main() {
+                        gl_FragColor = f_color;
+                    }"#,
+                },
+            ).unwrap())
+        ),
+        (
+            ShaderType::TexScaleOffset,
             Rc::new(ShaderProgram::new(
                 gl,
                 ShaderDescription {

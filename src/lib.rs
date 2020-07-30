@@ -45,11 +45,12 @@ use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 use winit::window::WindowBuilder;
+use fnv::FnvHashSet;
 
 use gadget::{Agent, Gadget, GadgetDef, State};
-use grid::{Grid, XY};
+use grid::Grid;
 use math::Vec2;
-use render::{Camera, GadgetRenderer, Model, UiRenderer};
+use render::{Camera, GadgetRenderer, Model, UiRenderer, SelectionRenderer};
 use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
 use render::{TextureType, TEXTURES};
 use ui::{Mode, WidgetIds};
@@ -92,10 +93,10 @@ pub struct Fonts {
 /// An undoable action.
 /// Stores the information needed to undo the action.
 pub enum UndoAction {
-    GadgetInsert { position: XY },
-    GadgetRemove { gadget: Gadget, position: XY },
-    AgentMove { position: Vec2, direction: XY },
-    GadgetChangeState { position: XY, state: State },
+    GadgetInsert { position: grid::XY },
+    GadgetRemove { gadget: Gadget, position: grid::XY },
+    AgentMove { position: Vec2, direction: grid::XY },
+    GadgetChangeState { position: grid::XY, state: State },
     Batch(Vec<UndoAction>),
 }
 
@@ -263,6 +264,10 @@ pub struct App<'a> {
     gadget_tile_xy: grid::XY,
     agent: Option<Agent>,
     gadget_select_rep: Gadget,
+    /// A list of gadget positions in the contraption that are selected,
+    /// along with cached sizes
+    selection: FnvHashSet<(grid::XY, grid::WH)>,
+    selection_renderer: SelectionRenderer,
     mode: Mode,
     ids: WidgetIds,
     ui_renderer: UiRenderer<'a>,
@@ -276,6 +281,7 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     const HEIGHT_MIN: f64 = 1.0;
     const HEIGHT_MAX: f64 = 32.0;
+    const WIDTH_MAX: f64 = 128.0;
 
     pub fn new(gl: Rc<Context>, ui: &mut Ui, _width: u32, _height: u32) -> Self {
         let camera = Camera::new_orthographic(
@@ -324,6 +330,7 @@ impl<'a> App<'a> {
 
         let gadget_renderer = GadgetRenderer::new(&gl);
         let ui_renderer = UiRenderer::new(&gl);
+        let selection_renderer = SelectionRenderer::new(&gl);
 
         let fonts = Fonts {
             regular: ui.fonts.insert(
@@ -359,6 +366,8 @@ impl<'a> App<'a> {
             gadget_tile_xy: vec2(0, 0),
             agent: None,
             gadget_select_rep,
+            selection: FnvHashSet::default(),
+            selection_renderer,
             mode: Mode::None,
             ids: widget_ids,
             ui_renderer,
@@ -382,14 +391,44 @@ impl<'a> App<'a> {
             .expect("Tride to take undo stack while undoing/redoing")
     }
 
+    /// Some things will no longer be valid after an undo.
+    pub fn invalidate_before_undo(&mut self) {
+        // A selected gadget may be deleted
+        self.selection.clear();
+    }
+
+    pub fn undo(&mut self) {
+        self.invalidate_before_undo();
+
+        let mut stack = self.undo_stack_take();
+        stack.undo(self);
+        self.undo_stacks[self.undo_stack_index] = Some(stack);
+    }
+
+    pub fn redo(&mut self) {
+        self.invalidate_before_undo();
+
+        let mut stack = self.undo_stack_take();
+        stack.redo(self);
+        self.undo_stacks[self.undo_stack_index] = Some(stack);
+    }
+
+    pub fn clamp_height(&mut self, ui: &Ui) {
+        self.height = self.height.max(Self::HEIGHT_MIN)
+            .min(Self::HEIGHT_MAX)
+            .min(Self::WIDTH_MAX * ui.win_h / ui.win_w);
+    }
+
     pub fn update(&mut self, ui: &mut Ui) {
+        self.clamp_height(ui);
+
+        self.update_ui(ui);
+
         self.camera.set_orthographic_projection(
             ui.win_w / ui.win_h * self.height,
             self.height,
             1.0,
         );
-
-        self.update_ui(ui);
 
         let cx = self.center.x;
         let cy = self.center.y;
@@ -399,6 +438,8 @@ impl<'a> App<'a> {
 
     pub fn render(&mut self, ui: &mut Ui, width: f64, height: f64) {
         self.gl.clear();
+
+        self.selection_renderer.render(&self.selection, &self.camera);
 
         render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
 
@@ -426,18 +467,16 @@ impl<'a> App<'a> {
 
     pub fn handle_input(&mut self, event: &Event<()>) {
         match event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::MouseWheel {
-                        delta: MouseScrollDelta::PixelDelta(LogicalPosition { y: delta, .. }),
-                        ..
-                    },
-                ..
-            } => {
-                self.height = (self.height + *delta / 64.0)
-                    .max(Self::HEIGHT_MIN)
-                    .min(Self::HEIGHT_MAX)
-            }
+            //Event::WindowEvent {
+            //    event:
+            //        WindowEvent::MouseWheel {
+            //            delta: MouseScrollDelta::PixelDelta(LogicalPosition { y: delta, .. }),
+            //            ..
+            //        },
+            //    ..
+            //} => {
+            //    self.height = self.height + *delta / 64.0
+            //}
 
             //TODO: Implement the event in winit for the web
             //Event::WindowEvent {
@@ -465,15 +504,11 @@ impl<'a> App<'a> {
                     if let ElementState::Pressed = state {
                         match keycode {
                             VirtualKeyCode::Z => {
-                                let mut stack = self.undo_stack_take();
-                                stack.undo(self);
-                                self.undo_stacks[self.undo_stack_index] = Some(stack);
+                                self.undo();
                             }
 
                             VirtualKeyCode::Y => {
-                                let mut stack = self.undo_stack_take();
-                                stack.redo(self);
-                                self.undo_stacks[self.undo_stack_index] = Some(stack);
+                                self.redo();
                             }
 
                             _ => {}

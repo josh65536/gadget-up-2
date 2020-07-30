@@ -54,7 +54,7 @@ impl<'a> UiRenderer<'a> {
                 .dimensions(GLYPH_CACHE_WIDTH as u32, GLYPH_CACHE_HEIGHT as u32)
                 .build(),
             camera,
-            program: Rc::clone(&SHADERS.borrow()[ShaderType::ScaleOffset]),
+            program: Rc::clone(&SHADERS.borrow()[ShaderType::TexScaleOffset]),
             triangles: TrianglesEx::default(),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),

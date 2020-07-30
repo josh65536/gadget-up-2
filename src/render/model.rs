@@ -197,7 +197,17 @@ impl Model {
         RenderingModel(self)
     }
 
-    fn render(&self, transform: Mat4, camera: &Camera) {
+    pub fn prepare_render_instanced<'a>(&'a self, instance_buffer: &VertexBuffer, instanced_names: &'a [&'a str]) -> InstancedRenderingModel {
+        self.program.bind_if_not_bound();
+
+        self.program
+            .prepare_draw_instanced(&self.vertex_buffer, &self.index_buffer, instance_buffer, instanced_names)
+            .unwrap();
+
+        InstancedRenderingModel(self, instanced_names)
+    }
+
+    fn set_transform(&self, transform: Mat4, camera: &Camera) {
         let transform: Mat4 = camera.get_projection() * camera.get_view() * transform;
 
         self.program
@@ -206,11 +216,30 @@ impl Model {
                 UniformValue::Matrix4(*transform.cast::<f32>().unwrap().as_ref()),
             )
             .unwrap();
+    }
 
+    fn render_raw(&self) {
         unsafe {
             self.program
                 .draw_prepared(0..self.num_indexes, GeometryMode::Triangles)
         }
+    }
+
+    fn render_instanced_raw(&self, count: i32) {
+        unsafe {
+            self.program
+                .draw_prepared_instanced(0..self.num_indexes, GeometryMode::Triangles, count)
+        }
+    }
+
+    fn render(&self, transform: Mat4, camera: &Camera) {
+        self.set_transform(transform, camera);
+        self.render_raw();
+    }
+
+    fn render_instanced(&self, transform: Mat4, camera: &Camera, count: i32) {
+        self.set_transform(transform, camera);
+        self.render_instanced_raw(count);
     }
 }
 
@@ -220,6 +249,10 @@ impl Model {
 pub struct RenderingModel<'a>(&'a Model);
 
 impl<'a> RenderingModel<'a> {
+    pub fn render_raw(&self) {
+        self.0.render_raw()
+    }
+
     pub fn render(&self, transform: Mat4, camera: &Camera) {
         self.0.render(transform, camera)
     }
@@ -229,11 +262,36 @@ impl<'a> RenderingModel<'a> {
     }
 }
 
+pub struct InstancedRenderingModel<'a>(&'a Model, &'a[&'a str]);
+
+impl<'a> InstancedRenderingModel<'a> {
+    pub fn render_raw(&self, count: i32) {
+        self.0.render_instanced_raw(count);
+    }
+
+    pub fn render(&self, transform: Mat4, camera: &Camera, count: i32) {
+        self.0.render_instanced(transform, camera, count)
+    }
+
+    pub fn render_position(&self, position: Vec3, camera: &Camera, count: i32) {
+        self.render(Mat4::from_translation(position), camera, count);
+    }
+}
+
+impl<'a> Drop for InstancedRenderingModel<'a> {
+    fn drop(&mut self) {
+        self.0.program.end_draw_instanced(self.1);
+    }
+}
+
 /// Names of triangles structures
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum TrianglesType {
     Agent,
     GadgetRectangle,
+    Undo,
+    Select,
+    SelectionMark,
 }
 
 type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
@@ -266,6 +324,18 @@ fn triangles_map(_: ()) -> TrianglesMap {
                 vec![0, 1, 2, 2, 3, 0],
             )),
         ),
+        (
+            TrianglesType::Undo,
+            Rc::new(include!("../../assets/models/undo.tris")),
+        ),
+        (
+            TrianglesType::Select,
+            Rc::new(include!("../../assets/models/select.tris")),
+        ),
+        (
+            TrianglesType::SelectionMark,
+            Rc::new(include!("../../assets/models/selection_mark.tris")),
+        ),
     ]
     .iter()
     .cloned()
@@ -282,6 +352,10 @@ ref_thread_local!(
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModelType {
     Agent,
+    GadgetRectangleInstanced,
+    Undo,
+    Select,
+    SelectionMarkInstanced,
 }
 
 type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
@@ -293,14 +367,48 @@ ref_thread_local!(
 );
 
 fn model_map(gl: &Context) -> ModelMap {
-    [(
-        ModelType::Agent,
-        Rc::new(Model::new(
-            gl,
-            &SHADERS.borrow()[ShaderType::Basic],
-            &TRIANGLESES.borrow()[TrianglesType::Agent],
-        )),
-    )]
+    [
+        (
+            ModelType::Agent,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Agent],
+            )),
+        ),
+        (
+            ModelType::GadgetRectangleInstanced,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Offset],
+                &TRIANGLESES.borrow()[TrianglesType::GadgetRectangle],
+            )),
+        ),
+        (
+            ModelType::Undo,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Undo],
+            )),
+        ),
+        (
+            ModelType::Select,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Select],
+            )),
+        ),
+        (
+            ModelType::SelectionMarkInstanced,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::SelectionMark],
+            )),
+        ),
+    ]
     .iter()
     .cloned()
     .collect()
