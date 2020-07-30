@@ -27,6 +27,7 @@ mod widget;
 use cgmath::{vec2, vec3};
 use conrod_core::text::{font, Font};
 use conrod_core::{Ui, UiBuilder};
+use fnv::FnvHashSet;
 use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
 use golem::blend::{BlendInput, BlendMode, BlendOperation};
 use golem::depth::{DepthTestFunction, DepthTestMode};
@@ -45,12 +46,11 @@ use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 use winit::window::WindowBuilder;
-use fnv::FnvHashSet;
 
 use gadget::{Agent, Gadget, GadgetDef, State};
 use grid::Grid;
 use math::Vec2;
-use render::{Camera, GadgetRenderer, Model, UiRenderer, SelectionRenderer};
+use render::{Camera, GadgetRenderer, Model, SelectionRenderer, UiRenderer};
 use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
 use render::{TextureType, TEXTURES};
 use ui::{Mode, WidgetIds};
@@ -255,6 +255,7 @@ pub struct App<'a> {
     center: Vec2,
     height: f64,
     grid: Grid<Gadget>,
+    grid_mouse_position: Vec2,
     gadget_renderer: GadgetRenderer,
     /// A list of gadgets that can be selected from the selector
     gadget_select: Vec<Gadget>,
@@ -268,6 +269,10 @@ pub struct App<'a> {
     /// along with cached sizes
     selection: FnvHashSet<(grid::XY, grid::WH)>,
     selection_renderer: SelectionRenderer,
+    /// The grid to paste
+    paste: Grid<Gadget>,
+    paste_xy: grid::XY,
+    paste_renderer: GadgetRenderer,
     mode: Mode,
     ids: WidgetIds,
     ui_renderer: UiRenderer<'a>,
@@ -329,6 +334,7 @@ impl<'a> App<'a> {
         MODELS.borrow_mut().init(&gl);
 
         let gadget_renderer = GadgetRenderer::new(&gl);
+        let paste_renderer = GadgetRenderer::new(&gl);
         let ui_renderer = UiRenderer::new(&gl);
         let selection_renderer = SelectionRenderer::new(&gl);
 
@@ -359,6 +365,7 @@ impl<'a> App<'a> {
             center: vec2(0.0, 0.0),
             height: 10.0,
             grid,
+            grid_mouse_position: vec2(0.0, 0.0),
             gadget_renderer,
             gadget_select: preset_gadgets::preset_gadgets(),
             gadget_selection: None,
@@ -368,6 +375,9 @@ impl<'a> App<'a> {
             gadget_select_rep,
             selection: FnvHashSet::default(),
             selection_renderer,
+            paste: Grid::new(),
+            paste_xy: vec2(0, 0),
+            paste_renderer,
             mode: Mode::None,
             ids: widget_ids,
             ui_renderer,
@@ -413,8 +423,52 @@ impl<'a> App<'a> {
         self.undo_stacks[self.undo_stack_index] = Some(stack);
     }
 
+    pub fn add_gadget_to_grid(&mut self, gadget: Gadget, position: grid::XY) {
+        let size = gadget.size();
+
+        let removed = self.grid.insert(gadget, position, size);
+        for (gadget, xy, _) in removed.into_iter() {
+            self.undo_stack_mut().push(UndoAction::GadgetRemove {
+                gadget,
+                position: xy,
+            });
+        }
+
+        self.undo_stack_mut()
+            .push(UndoAction::GadgetInsert { position });
+    }
+
+    pub fn remove_gadget_from_grid(&mut self, position: grid::XY) {
+        if let Some((gadget, xy, _)) = self.grid.remove(position) {
+            self.undo_stack_mut().push(UndoAction::GadgetRemove {
+                gadget,
+                position: xy,
+            });
+        }
+    }
+
+    pub fn remove_selected_gadgets(&mut self) {
+        for (xy, _) in self.selection.iter().copied().collect::<Vec<_>>() {
+            self.remove_gadget_from_grid(xy);
+        }
+        self.selection.clear();
+    }
+
+    /// Copies the selected gadgets
+    pub fn copy_selected_gadgets(&mut self) {
+        self.paste_xy = vec2(
+            self.grid_mouse_position.x.floor() as isize,
+            self.grid_mouse_position.y.floor() as isize,
+        );
+
+        self.paste = self.grid.iter().filter(|(_, xy, wh)| self.selection.contains(&(*xy, *wh)))
+            .cloned().collect::<Grid<_>>().translate(-self.paste_xy);
+    }
+
     pub fn clamp_height(&mut self, ui: &Ui) {
-        self.height = self.height.max(Self::HEIGHT_MIN)
+        self.height = self
+            .height
+            .max(Self::HEIGHT_MIN)
             .min(Self::HEIGHT_MAX)
             .min(Self::WIDTH_MAX * ui.win_h / ui.win_w);
     }
@@ -439,9 +493,14 @@ impl<'a> App<'a> {
     pub fn render(&mut self, ui: &mut Ui, width: f64, height: f64) {
         self.gl.clear();
 
-        self.selection_renderer.render(&self.selection, &self.camera);
+        self.selection_renderer
+            .render(&self.selection, &self.camera);
 
-        render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer);
+        render::render_grid(&self.grid, &self.camera, &mut self.gadget_renderer, vec2(0, 0), 0.0, true);
+
+        if self.mode == Mode::GadgetPaste {
+            render::render_grid(&self.paste, &self.camera, &mut self.paste_renderer, self.paste_xy, -0.25, false);
+        }
 
         if let Some(gadget) = &self.gadget_tile {
             gadget
@@ -511,19 +570,31 @@ impl<'a> App<'a> {
                                 self.redo();
                             }
 
+                            VirtualKeyCode::X => {
+                                if self.selection.len() > 0 {
+                                    self.copy_selected_gadgets();
+                                    self.remove_selected_gadgets();
+                                    self.set_mode(Mode::GadgetPaste);
+                                }
+                            }
+
+                            VirtualKeyCode::C => {
+                                if self.selection.len() > 0 {
+                                    self.copy_selected_gadgets();
+                                    self.set_mode(Mode::GadgetPaste);
+                                }
+                            }
+
                             _ => {}
                         }
                     }
                 } else {
-                    match keycode {
-                        VirtualKeyCode::R | VirtualKeyCode::T => {
-                            if let ElementState::Pressed = state {
+                    if let ElementState::Pressed = state {
+                        match keycode {
+                            VirtualKeyCode::R | VirtualKeyCode::T => {
+                                let num_turns = if *keycode == VirtualKeyCode::R {1} else {-1};
                                 if let Some(gadget) = &mut self.gadget_tile {
-                                    gadget.rotate(if *keycode == VirtualKeyCode::R {
-                                        1
-                                    } else {
-                                        -1
-                                    });
+                                    gadget.rotate(num_turns);
                                 }
 
                                 if self.mode == Mode::AgentPlace {
@@ -531,34 +602,51 @@ impl<'a> App<'a> {
                                         agent.flip();
                                     }
                                 }
-                            }
-                        }
 
-                        VirtualKeyCode::X => {
-                            if let ElementState::Pressed = state {
+                                if self.mode == Mode::GadgetPaste {
+                                    self.paste = std::mem::take(&mut self.paste).rotate(vec2(0.5, 0.5), num_turns as isize);
+                                }
+                            }
+
+                            VirtualKeyCode::X => {
                                 if let Some(gadget) = &mut self.gadget_tile {
                                     gadget.flip_ports_x();
                                 }
-                            }
-                        }
 
-                        VirtualKeyCode::Y => {
-                            if let ElementState::Pressed = state {
+                                if self.mode == Mode::GadgetPaste {
+                                    self.paste = std::mem::take(&mut self.paste).flip_x(0.5);
+                                }
+                            }
+
+                            VirtualKeyCode::Y => {
                                 if let Some(gadget) = &mut self.gadget_tile {
                                     gadget.flip_ports_y();
                                 }
-                            }
-                        }
 
-                        VirtualKeyCode::C => {
-                            if let ElementState::Pressed = state {
+                                if self.mode == Mode::GadgetPaste {
+                                    self.paste = std::mem::take(&mut self.paste).flip_y(0.5);
+                                }
+                            }
+
+                            VirtualKeyCode::C => {
                                 if let Some(gadget) = &mut self.gadget_tile {
                                     gadget.cycle_state();
                                 }
                             }
-                        }
 
-                        _ => {}
+                            VirtualKeyCode::Delete => {
+                                self.remove_selected_gadgets();
+                                self.undo_stack_mut().batch();
+                            }
+
+                            VirtualKeyCode::Escape => {
+                                if self.mode == Mode::GadgetPaste {
+                                    self.set_mode(Mode::Select);
+                                }
+                            }
+
+                            _ => {}
+                        }
                     }
 
                     if self.mode == Mode::Play {

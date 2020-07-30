@@ -3,15 +3,23 @@ use fnv::FnvHashMap;
 use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
-use crate::math::Vec2i;
+use crate::math::{Vec2i, Vec2, Vector2Ex};
 
 pub type XY = Vec2i;
 pub type WH = (usize, usize);
 
+pub trait GridItem {
+    fn rotate_in_grid(self, turns: isize) -> Self where Self: Sized { self }
+
+    fn flip_x_in_grid(self) -> Self where Self: Sized { self }
+
+    fn flip_y_in_grid(self) -> Self where Self: Sized { self }
+}
+
 /// Sparse grid for storing things that do not necessarily take up
 /// a 1x1 slot
-#[derive(Debug)]
-pub struct Grid<T> {
+#[derive(Clone, Debug)]
+pub struct Grid<T: GridItem> {
     /// Map from internal indexes to items, their minimal XY coordinates, and their sizes
     items: FnvHashMap<u64, (T, XY, WH)>,
     /// Map from XY coordinates to internal indexes
@@ -19,14 +27,20 @@ pub struct Grid<T> {
     next_idx: u64,
 }
 
-impl<T> Grid<T> {
-    /// Creates an empty grid
-    pub fn new() -> Self {
+impl<T: GridItem> Default for Grid<T> {
+    fn default() -> Self {
         Grid {
             items: FnvHashMap::default(),
             grid: FnvHashMap::default(),
             next_idx: 0,
         }
+    }
+}
+
+impl<T: GridItem> Grid<T> {
+    /// Creates an empty grid
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Gets the item at a specific position, along with that item's
@@ -127,6 +141,12 @@ impl<T> Grid<T> {
         }
     }
 
+    pub fn extend(&mut self, iter: impl IntoIterator<Item=(T, XY, WH)>) {
+        for (t, xy, wh) in iter.into_iter() {
+            self.insert(t, xy, wh);
+        }
+    }
+
     /// Inserts an item at a specific minimal XY position with a specific size.
     /// Removes and returns overlapping items.
     pub fn insert(&mut self, t: T, position: XY, size: WH) -> Vec<(T, XY, WH)> {
@@ -171,9 +191,49 @@ impl<T> Grid<T> {
             None
         }
     }
+
+    /// Moves the grid by some vector
+    pub fn translate(self, vec: XY) -> Self {
+        self.into_iter().map(|(t, xy, wh)| (t, xy + vec, wh)).collect()
+    }
+
+    /// Rotates the grid around some point by some number of counterclockwise right turns.
+    /// The rotation will effectively be around some half-integer coordinates
+    pub fn rotate(self, center: Vec2, turns: isize) -> Self {
+        let turns = turns.rem_euclid(4);
+        let center = vec2(center.x.floor() as isize, center.y.floor() as isize);
+
+        self.into_iter().map(|(t, mut xy, mut wh)| {
+            for _ in 0..turns {
+                xy = (xy - center).right_ccw() + center;
+                wh = (wh.1, wh.0);
+                xy.x = xy.x + 1 - wh.0 as isize;
+            }
+
+            (t.rotate_in_grid(turns), xy, wh)
+        }).collect()
+    }
+
+    /// Flips the x coordinates in the grid around some x position.
+    /// The axis will effecively be at some half-integer coordinate.
+    pub fn flip_x(self, x: f64) -> Self {
+        self.into_iter().map(|(t, mut xy, (w, h))| {
+            xy.x = 2 * x.floor() as isize + 1 - xy.x - w as isize;
+            (t.flip_x_in_grid(), xy, (w, h))
+        }).collect()
+    }
+
+    /// Flips the y coordinates in the grid around some y position.
+    /// The axis will effecively be at some half-integer coordinate.
+    pub fn flip_y(self, y: f64) -> Self {
+        self.into_iter().map(|(t, mut xy, (w, h))| {
+            xy.y = 2 * y.floor() as isize + 1 - xy.y - h as isize;
+            (t.flip_y_in_grid(), xy, (w, h))
+        }).collect()
+    }
 }
 
-impl<T> FromIterator<(T, XY, WH)> for Grid<T> {
+impl<T: GridItem> FromIterator<(T, XY, WH)> for Grid<T> {
     fn from_iter<I: IntoIterator<Item = (T, XY, WH)>>(i: I) -> Self {
         let mut g = Self::new();
 
@@ -184,6 +244,23 @@ impl<T> FromIterator<(T, XY, WH)> for Grid<T> {
         g
     }
 }
+
+impl<T: GridItem> IntoIterator for Grid<T> {
+    type Item = (T, XY, WH);
+    // Oof, long type name
+    type IntoIter = std::iter::Map<<FnvHashMap<u64, (T, XY, WH)> as IntoIterator>::IntoIter, fn((u64, (T, XY, WH))) -> (T, XY, WH)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        fn value<K, V>(tup: (K, V)) -> V {
+            tup.1
+        }
+
+        self.items.into_iter().map(value)
+    }
+}
+
+// To make the test cases work
+impl<'a> GridItem for &'a str {}
 
 #[cfg(test)]
 mod test {
@@ -218,5 +295,83 @@ mod test {
         grid.insert("b", vec2(1, 1), (2, 2));
 
         assert_eq!(None, grid.get(vec2(0, 0)));
+    }
+
+    #[test]
+    fn test_translate() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.translate(vec2(-1, 5));
+
+        assert_eq!(
+            ("a", vec2(-2, 7), (3, 2)),
+            *grid.iter().next().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_rotate_ccw() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.rotate(vec2(-0.5, 2.5), 1);
+
+        assert_eq!(
+            ("a", vec2(-2, 2), (2, 3)),
+            *grid.iter().next().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_rotate_upside_down() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.rotate(vec2(1.5, -1.5), 2);
+
+        assert_eq!(
+            ("a", vec2(1, -7), (3, 2)),
+            *grid.iter().next().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_rotate_cw() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.rotate(vec2(-0.5, 2.5), -1);
+
+        assert_eq!(
+            ("a", vec2(-1, 0), (2, 3)),
+            *grid.iter().next().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_flip_x() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.flip_x(1.5);
+
+        assert_eq!(
+            ("a", vec2(1, 2), (3, 2)),
+            *grid.iter().next().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_flip_y() {
+        let mut grid = Grid::new();
+        grid.insert("a", vec2(-1, 2), (3, 2));
+
+        let grid = grid.flip_y(-0.5);
+
+        assert_eq!(
+            ("a", vec2(-1, -5), (3, 2)),
+            *grid.iter().next().unwrap()
+        );
     }
 }

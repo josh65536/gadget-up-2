@@ -5,6 +5,7 @@ use cgmath::{vec3, vec4, Deg};
 
 use crate::math::{Degrees, Mat4, Pt3, Vec3, Vec4};
 
+#[derive(Clone, Debug)]
 pub struct Camera {
     position: Vec3,
     target: Vec3,

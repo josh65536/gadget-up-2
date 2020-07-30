@@ -6,8 +6,9 @@ use ref_thread_local::RefThreadLocal;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
+use std::fmt::{self, Debug, Formatter};
 
-use crate::grid::{Grid, WH, XY};
+use crate::grid::{Grid, WH, XY, GridItem};
 use crate::log;
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
@@ -396,6 +397,23 @@ impl Gadget {
     }
 }
 
+impl GridItem for Gadget {
+    fn rotate_in_grid(mut self, turns: isize) -> Self {
+        self.rotate(turns as i32);
+        self
+    }
+
+    fn flip_x_in_grid(mut self) -> Self {
+        self.flip_ports_x();
+        self
+    }
+
+    fn flip_y_in_grid(mut self) -> Self {
+        self.flip_ports_y();
+        self
+    }
+}
+
 impl Clone for Gadget {
     fn clone(&self) -> Self {
         Self {
@@ -407,6 +425,18 @@ impl Clone for Gadget {
             render: self.render.clone(),
             dirty: self.dirty.clone(),
         }
+    }
+}
+
+impl Debug for Gadget {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Gadget")
+            .field("name", &self.name)
+            .field("def", &self.def)
+            .field("size", &self.size)
+            .field("port_map", &self.port_map)
+            .field("state", &self.state)
+            .finish()
     }
 }
 
@@ -626,6 +656,8 @@ impl Agent {
                 }
 
                 if let Some((s1, p1)) = sp {
+                    // No floor necessary because this becomes an integer
+                    // when multiplied by 2
                     let pos2 = (gadget.port_positions()[p1.0] * 2.0)
                         .cast::<isize>()
                         .unwrap();

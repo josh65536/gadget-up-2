@@ -3,17 +3,17 @@ use cgmath::{vec2, vec4, Point3, Vector2};
 
 use conrod_core::event::{Event as ConrodEvent, Input as ConrodInput};
 use conrod_core::input::widget::Mouse;
-use conrod_core::input::{Motion, ModifierKey};
-use conrod_core::widget::{self, Widget, BorderedRectangle};
+use conrod_core::input::{ModifierKey, Motion};
 use conrod_core::widget::bordered_rectangle;
+use conrod_core::widget::{self, BorderedRectangle, Widget};
 use conrod_core::widget_ids;
-use conrod_core::{Point, Rect, color};
+use conrod_core::{color, Point, Rect};
 use conrod_core::{Positionable, Sizeable};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
-use crate::log;
 use crate::bitfield;
 use crate::grid::XY;
+use crate::log;
 use crate::math::Vec2;
 use crate::render::Camera;
 use crate::ui::Mode;
@@ -249,8 +249,10 @@ impl<'a> ContraptionScreen<'a> {
                 }
 
                 if state.input.is_left() {
-                    let corner_0 = Self::world_to_screen(state.selection_start, camera, rect.w(), rect.h());
-                    let corner_1 = Self::world_to_screen(state.position, camera, rect.w(), rect.h());
+                    let corner_0 =
+                        Self::world_to_screen(state.selection_start, camera, rect.w(), rect.h());
+                    let corner_1 =
+                        Self::world_to_screen(state.position, camera, rect.w(), rect.h());
                     let selection_rect = Rect::from_corners(corner_0, corner_1);
 
                     BorderedRectangle::new([selection_rect.w(), selection_rect.h()])
@@ -267,16 +269,45 @@ impl<'a> ContraptionScreen<'a> {
                 if state.released.is_left() {
                     let modifiers = ui.global_input().current.modifiers;
 
-                    events.push(Event::Select(Rect::from_corners(
-                        state.selection_start.into(),
-                        state.position.into(),
-                    ),
-                    match modifiers {
-                        ModifierKey::SHIFT => SelectFunc::Add,
-                        ModifierKey::CTRL => SelectFunc::Xor,
-                        ModifierKey::ALT => SelectFunc::Subtract,
-                        _ => SelectFunc::Replace,
-                    }));
+                    events.push(Event::Select(
+                        Rect::from_corners(state.selection_start.into(), state.position.into()),
+                        match modifiers {
+                            ModifierKey::SHIFT => SelectFunc::Add,
+                            ModifierKey::CTRL => SelectFunc::Xor,
+                            ModifierKey::ALT => SelectFunc::Subtract,
+                            _ => SelectFunc::Replace,
+                        },
+                    ));
+                }
+            }
+        });
+
+        events
+    }
+
+    fn update_gadget_paste(self, args: widget::UpdateArgs<Self>) -> <Self as Widget>::Event {
+        let id = args.id;
+        let state = args.state;
+        let rect = args.rect;
+        let ui = args.ui;
+
+        let Self { camera: _, .. } = self;
+
+        let mut events = vec![];
+
+        state.update(|state| {
+            if let Some(mouse) = ui.widget_input(id).mouse() {
+                if mouse.is_over() {
+                    let (_w, _h) = rect.w_h();
+
+                    let x = state.position[0].floor() as isize;
+                    let y = state.position[1].floor() as isize;
+
+                    if state.pressed.is_left() {
+                        events.push(Event::GadgetPaste(vec2(x, y)));
+                    }
+
+                    events.push(Event::GadgetPasteHover(vec2(x, y)));
                 }
             }
         });
@@ -315,6 +346,12 @@ pub enum Event {
     Zoom(Vec2, f64),
     /// Rectangle selection made
     Select(Rect, SelectFunc),
+    /// Pasted copied selection
+    GadgetPaste(XY),
+    /// Mouse moved over (X, Y) in gadget paste mode
+    GadgetPasteHover(XY),
+    /// Communicates the position of the mouse in the grid
+    MousePosition(Vec2),
 }
 
 impl<'a> Widget for ContraptionScreen<'a> {
@@ -357,10 +394,10 @@ impl<'a> Widget for ContraptionScreen<'a> {
             )
         });
 
-        let mut vec = vec![];
+        let mut vec = vec![Event::MousePosition(args.state.position)];
 
         for event in args.ui.global_input().events() {
-            if let ConrodEvent::Raw(ConrodInput::Motion(Motion::Scroll { x, y})) = event {
+            if let ConrodEvent::Raw(ConrodInput::Motion(Motion::Scroll { x, y })) = event {
                 vec.push(Event::Zoom(args.state.position, -*y / 64.0));
                 break;
             }
@@ -380,6 +417,7 @@ impl<'a> Widget for ContraptionScreen<'a> {
             Mode::TilePaint => self.update_paint_tile(args),
             Mode::AgentPlace => self.update_place_agent(args),
             Mode::Select => self.update_select(args),
+            Mode::GadgetPaste => self.update_gadget_paste(args),
             _ => vec![],
         });
 

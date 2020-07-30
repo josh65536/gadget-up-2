@@ -3,7 +3,7 @@ use super::{Model, ModelType, Triangles, Vertex, MODELS};
 use crate::gadget::{Agent, Gadget, PP};
 use crate::grid::{Grid, WH, XY};
 use crate::log;
-use crate::math::{Mat4, Vec2, Vector2Ex, Vec2i};
+use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::shape::{Circle, Path, Rectangle, Shape};
 
 use cgmath::{vec2, vec3, vec4};
@@ -221,7 +221,7 @@ pub trait GridItemRenderer {
     fn begin(&mut self);
 
     /// Render a specific item
-    fn render(&mut self, item: Option<&Self::Item>, position: XY, size: WH);
+    fn render(&mut self, item: Option<&Self::Item>, position: XY, size: WH, z: f64);
 
     /// Finalize the rendering of the grid
     fn end(&mut self, camera: &Camera);
@@ -254,7 +254,7 @@ impl GadgetRenderer {
         }
     }
 
-    pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, _size: WH) {
+    pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, _size: WH, z: f64) {
         let x = position.x as f32;
         let y = position.y as f32;
 
@@ -263,7 +263,7 @@ impl GadgetRenderer {
                 .renderer()
                 .triangles()
                 .clone()
-                .with_extra([x, y, 0.0]),
+                .with_extra([x, y, z as f32]),
         );
     }
 }
@@ -278,13 +278,17 @@ impl GridItemRenderer for GadgetRenderer {
     }
 
     /// Render a specific item
-    fn render(&mut self, item: Option<&Self::Item>, position: XY, size: WH) {
+    fn render(&mut self, item: Option<&Self::Item>, position: XY, size: WH, z: f64) {
         if let Some(gadget) = item {
-            self.render_gadget(gadget, position, size);
+            self.render_gadget(gadget, position, size, z);
         } else {
             let x = position.x as f32;
             let y = position.y as f32;
-            self.instance_positions.extend_from_slice(&[x, y, GadgetRenderInfo::RECTANGLE_Z as f32]);
+            self.instance_positions.extend_from_slice(&[
+                x,
+                y,
+                (z + GadgetRenderInfo::RECTANGLE_Z) as f32,
+            ]);
 
             //self.triangles.append(
             //    (*TRIANGLESES.borrow()[TrianglesType::GadgetRectangle])
@@ -309,11 +313,15 @@ impl GridItemRenderer for GadgetRenderer {
         self.vertex_buffer
             .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
         self.index_buffer.set_data(&self.triangles.indexes());
-        self.instance_buffer.set_data(&self.instance_positions);
 
-        // Same program; transform already set
-        self.background.prepare_render_instanced(&self.instance_buffer, &["v_offset"])
-            .render_raw(self.instance_positions.len() as i32 / 3);
+        if self.instance_positions.len() > 0 {
+            self.instance_buffer.set_data(&self.instance_positions);
+
+            // Same program; transform already set
+            self.background
+                .prepare_render_instanced(&self.instance_buffer, &["v_offset"])
+                .render_raw(self.instance_positions.len() as i32 / 3);
+        }
 
         unsafe {
             self.program
@@ -347,7 +355,11 @@ impl SelectionRenderer {
         }
     }
 
-    pub fn render<'a>(&mut self, selection: impl IntoIterator<Item = &'a (XY, WH)>, camera: &Camera) {
+    pub fn render<'a>(
+        &mut self,
+        selection: impl IntoIterator<Item = &'a (XY, WH)>,
+        camera: &Camera,
+    ) {
         self.instance_data.clear();
 
         let mut count = 0;
@@ -377,7 +389,8 @@ impl SelectionRenderer {
 
         self.instance_buffer.set_data(&self.instance_data);
 
-        self.model.prepare_render_instanced(&self.instance_buffer, &["v_scale", "v_offset"])
+        self.model
+            .prepare_render_instanced(&self.instance_buffer, &["v_scale", "v_offset"])
             .render_position(vec3(0.0, 0.0, 0.0), camera, count);
     }
 }

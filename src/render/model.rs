@@ -197,11 +197,20 @@ impl Model {
         RenderingModel(self)
     }
 
-    pub fn prepare_render_instanced<'a>(&'a self, instance_buffer: &VertexBuffer, instanced_names: &'a [&'a str]) -> InstancedRenderingModel {
+    pub fn prepare_render_instanced<'a>(
+        &'a self,
+        instance_buffer: &VertexBuffer,
+        instanced_names: &'a [&'a str],
+    ) -> InstancedRenderingModel {
         self.program.bind_if_not_bound();
 
         self.program
-            .prepare_draw_instanced(&self.vertex_buffer, &self.index_buffer, instance_buffer, instanced_names)
+            .prepare_draw_instanced(
+                &self.vertex_buffer,
+                &self.index_buffer,
+                instance_buffer,
+                instanced_names,
+            )
             .unwrap();
 
         InstancedRenderingModel(self, instanced_names)
@@ -227,8 +236,11 @@ impl Model {
 
     fn render_instanced_raw(&self, count: i32) {
         unsafe {
-            self.program
-                .draw_prepared_instanced(0..self.num_indexes, GeometryMode::Triangles, count)
+            self.program.draw_prepared_instanced(
+                0..self.num_indexes,
+                GeometryMode::Triangles,
+                count,
+            )
         }
     }
 
@@ -262,7 +274,7 @@ impl<'a> RenderingModel<'a> {
     }
 }
 
-pub struct InstancedRenderingModel<'a>(&'a Model, &'a[&'a str]);
+pub struct InstancedRenderingModel<'a>(&'a Model, &'a [&'a str]);
 
 impl<'a> InstancedRenderingModel<'a> {
     pub fn render_raw(&self, count: i32) {

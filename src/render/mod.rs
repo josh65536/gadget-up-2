@@ -14,7 +14,7 @@ pub use texture::{TextureType, TEXTURES};
 pub use ui::UiRenderer;
 
 use crate::gadget::Gadget;
-use crate::grid::{Grid, WH, XY};
+use crate::grid::{Grid, WH, XY, GridItem};
 
 use crate::log;
 use crate::shape::{Rectangle, Shape};
@@ -30,7 +30,9 @@ use std::rc::Rc;
 /// with X in the grid pointing in the X direction
 ///  and Y in the grid pointing in the Y direction.
 /// Also assumes that the camera is looking directly at the grid, with no rotation.
-pub fn render_grid<T, R>(grid: &Grid<T>, camera: &Camera, r: &mut R)
+/// A z-index and offset is provided.
+/// The background is optionally rendered.
+pub fn render_grid<T: GridItem, R>(grid: &Grid<T>, camera: &Camera, r: &mut R, xy: XY, z: f64, render_background: bool)
 where
     R: GridItemRenderer<Item = T>,
 {
@@ -47,13 +49,18 @@ where
 
     r.begin();
 
-    for xy in grid.get_empty_in_bounds(min_x, max_x, min_y, max_y) {
-        r.render(None, xy, (1, 1));
+    if render_background {
+        for xy in grid.get_empty_in_bounds(min_x, max_x, min_y, max_y) {
+            r.render(None, xy, (1, 1), z);
+        }
     }
 
     for (t, xy, wh) in grid.get_in_bounds(min_x, max_x, min_y, max_y) {
-        r.render(Some(t), *xy, *wh);
+        r.render(Some(t), *xy, *wh, z);
     }
 
-    r.end(camera);
+    let offset = xy.cast::<f64>().unwrap().extend(0.0);
+    let mut camera = camera.clone();
+    camera.set_view(camera.position() - offset, camera.target() - offset, *camera.up());
+    r.end(&camera);
 }

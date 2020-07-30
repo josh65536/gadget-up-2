@@ -12,12 +12,12 @@ use ref_thread_local::RefThreadLocal;
 
 use crate::gadget::Agent;
 use crate::log;
+use crate::math::Vec2i;
 use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MODELS};
 use crate::render::{SHADERS, TRIANGLESES};
-use crate::math::Vec2i;
 use crate::widget::button;
-use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::widget::screen::SelectFunc;
+use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
 use crate::UndoAction;
 
@@ -45,6 +45,7 @@ pub enum Mode {
     AgentPlace,
     Play,
     Select,
+    GadgetPaste,
 }
 
 impl<'a> App<'a> {
@@ -88,6 +89,11 @@ impl<'a> App<'a> {
                 self.selection.clear();
             }
 
+            if self.mode == Mode::GadgetPaste {
+                // Just in case a cut was performed without a paste
+                self.undo_stack_mut().batch();
+            }
+
             self.mode = mode;
         }
     }
@@ -111,23 +117,9 @@ impl<'a> App<'a> {
                             && gadget.def().num_ports() == 0
                             && gadget.size() == (1, 1)
                         {
-                            if let Some((gadget, xy, _)) = self.grid.remove(xy) {
-                                self.undo_stack_mut().push(UndoAction::GadgetRemove {
-                                    gadget,
-                                    position: xy,
-                                });
-                            }
+                            self.remove_gadget_from_grid(xy);
                         } else {
-                            let removed = self.grid.insert(gadget.clone(), xy, gadget.size());
-                            for (gadget, xy, _) in removed.into_iter() {
-                                self.undo_stack_mut().push(UndoAction::GadgetRemove {
-                                    gadget,
-                                    position: xy,
-                                });
-                            }
-
-                            self.undo_stack_mut()
-                                .push(UndoAction::GadgetInsert { position: xy });
+                            self.add_gadget_to_grid(gadget.clone(), xy);
                         }
                         crate::save_grid_in_url(&self.grid);
                     }
@@ -171,18 +163,47 @@ impl<'a> App<'a> {
                 screen::Event::Select(rect, func) => {
                     let (l, r, b, t) = rect.l_r_b_t();
 
-                    let selection = self.grid.get_in_bounds(l, r, b, t)
+                    let selection = self
+                        .grid
+                        .get_in_bounds(l, r, b, t)
                         .map(|(_, xy, wh)| (*xy, *wh));
 
                     match func {
                         SelectFunc::Replace => self.selection = selection.collect(),
 
                         SelectFunc::Add => self.selection.extend(selection),
-                        
-                        SelectFunc::Subtract => self.selection = self.selection.difference(&selection.collect()).copied().collect(),
 
-                        SelectFunc::Xor => self.selection = self.selection.symmetric_difference(&selection.collect()).copied().collect(),
+                        SelectFunc::Subtract => {
+                            self.selection = self
+                                .selection
+                                .difference(&selection.collect())
+                                .copied()
+                                .collect()
+                        }
+
+                        SelectFunc::Xor => {
+                            self.selection = self
+                                .selection
+                                .symmetric_difference(&selection.collect())
+                                .copied()
+                                .collect()
+                        }
                     }
+                }
+
+                screen::Event::GadgetPaste(xy) => {
+                    for (t, xy, _) in self.paste.clone().translate(xy) {
+                        self.add_gadget_to_grid(t, xy);
+                    }
+                    self.undo_stack_mut().batch();
+                }
+
+                screen::Event::GadgetPasteHover(xy) => {
+                    self.paste_xy = xy;
+                }
+
+                screen::Event::MousePosition(position) => {
+                    self.grid_mouse_position = position;
                 }
             }
         }
@@ -261,6 +282,25 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Select])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Select"),
+            &mut ui,
+        ) {
+            self.set_mode(Mode::Select);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
                     (*TRIANGLESES.borrow()[TrianglesType::Undo])
                         .clone()
                         .with_default_extra(),
@@ -294,25 +334,6 @@ impl<'a> App<'a> {
             &mut ui,
         ) {
             self.redo();
-        }
-
-        for _ in items.next(&ui).unwrap().set(
-            as_menu_button(
-                Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Select])
-                        .clone()
-                        .with_default_extra(),
-                    vec2(0.0, 0.0),
-                    2.0,
-                    2.0,
-                )),
-                self,
-                &mut ui,
-            )
-            .tooltip_text("Select"),
-            &mut ui,
-        ) {
-            self.set_mode(Mode::Select);
         }
 
         // Gadget selector
