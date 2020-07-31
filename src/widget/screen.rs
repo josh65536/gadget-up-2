@@ -1,19 +1,19 @@
 use cgmath::prelude::*;
-use cgmath::{vec2, vec4, Point3, Vector2};
+use cgmath::{vec2, vec4, Point3};
 
-use conrod_core::event::{Event as ConrodEvent, Input as ConrodInput, Motion as MotionEvent, Ui};
+use conrod_core::event::{Event as ConrodEvent, Input as ConrodInput};
 use conrod_core::input::widget::Mouse;
 use conrod_core::input::{ModifierKey, Motion};
 use conrod_core::widget::bordered_rectangle;
 use conrod_core::widget::{self, BorderedRectangle, Widget};
 use conrod_core::widget_ids;
 use conrod_core::{color, Point, Rect};
-use conrod_core::{Positionable, Sizeable};
+use conrod_core::Positionable;
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use crate::bitfield;
 use crate::grid::XY;
-use crate::log;
+
 use crate::math::Vec2;
 use crate::render::Camera;
 use crate::ui::{LeftMouseAction, Mode};
@@ -247,7 +247,7 @@ impl<'a> ContraptionScreen<'a> {
         let mut events = vec![];
 
         state.update(|state| {
-            if let Some(mouse) = ui.widget_input(id).mouse() {
+            if let Some(_mouse) = ui.widget_input(id).mouse() {
                 if state.pressed.is_left() {
                     state.selection_start = state.position;
                     events.push(Event::SelectStart(state.selection_start));
@@ -291,10 +291,10 @@ impl<'a> ContraptionScreen<'a> {
     }
 
     fn update_gadget_move(self, args: widget::UpdateArgs<Self>) -> <Self as Widget>::Event {
-        let id = args.id;
+        let _id = args.id;
         let state = args.state;
-        let rect = args.rect;
-        let ui = args.ui;
+        let _rect = args.rect;
+        let _ui = args.ui;
 
         let Self { camera: _, .. } = self;
 
@@ -419,7 +419,7 @@ impl<'a> Widget for ContraptionScreen<'a> {
         let mut vec = vec![Event::MousePosition(args.state.position)];
 
         for event in args.ui.global_input().events() {
-            if let ConrodEvent::Raw(ConrodInput::Motion(Motion::Scroll { x, y })) = event {
+            if let ConrodEvent::Raw(ConrodInput::Motion(Motion::Scroll { x: _, y })) = event {
                 vec.push(Event::Zoom(args.state.position, -*y / 64.0));
                 break;
             }

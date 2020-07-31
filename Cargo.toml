@@ -16,6 +16,12 @@ crate-type = ["cdylib"]
 # so it's only enabled in release mode.
 lto = true
 panic = "abort"
+# Profiling-specific
+debug = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O4', '-g']
+# End profiling-specific
 
 [features]
 # If you uncomment this line, it will enable `wee_alloc`:

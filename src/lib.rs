@@ -28,20 +28,19 @@ use cgmath::{vec2, vec3};
 use conrod_core::text::{font, Font};
 use conrod_core::{Ui, UiBuilder};
 use fnv::FnvHashSet;
-use golem::blend::{BlendChannel, BlendEquation, BlendFactor, BlendFunction};
-use golem::blend::{BlendInput, BlendMode, BlendOperation};
+
+use golem::blend::BlendMode;
 use golem::depth::{DepthTestFunction, DepthTestMode};
 use golem::Context;
-use golem::ShaderProgram;
-use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet};
+
 use ref_thread_local::RefThreadLocal;
-use std::cell::{RefCell, RefMut};
+
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
+
+use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event::{ModifiersState, MouseScrollDelta};
+use winit::event::{ModifiersState};
 use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
@@ -50,15 +49,16 @@ use winit::window::WindowBuilder;
 use gadget::{Agent, Gadget, GadgetDef, State};
 use grid::Grid;
 use math::Vec2;
-use render::{Camera, GadgetRenderer, Model, SelectionRenderer, UiRenderer};
-use render::{ModelType, ShaderType, TrianglesType, MODELS, SHADERS, TRIANGLESES};
-use render::{TextureType, TEXTURES};
+use render::{Camera, GadgetRenderer, SelectionRenderer, UiRenderer};
+use render::{MODELS, SHADERS, TRIANGLESES};
+use render::{TEXTURES};
 use ui::{LeftMouseAction, Mode, WidgetIds};
 
 #[macro_export]
 macro_rules! log {
     ( $($t:tt)* ) => {
         // To get rid of the unnecessary rust-analyzer error
+        #[allow(unused_unsafe)]
         unsafe {
             web_sys::console::log_1(&format!( $($t)* ).into());
         }
@@ -69,6 +69,7 @@ macro_rules! log {
 macro_rules! elog {
     ( $($t:tt)* ) => {
         // To get rid of the unnecessary rust-analyzer error
+        #[allow(unused_unsafe)]
         unsafe {
             web_sys::console::error_1(&format!( $($t)* ).into());
         }
@@ -83,6 +84,7 @@ macro_rules! elog {
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+#[allow(dead_code)]
 pub struct Fonts {
     regular: font::Id,
     italic: font::Id,
@@ -180,7 +182,7 @@ impl UndoStack {
                 })
             }
 
-            UndoAction::Batch(mut actions) => {
+            UndoAction::Batch(actions) => {
                 let mut rev_actions = vec![];
 
                 for action in actions.into_iter().rev() {
@@ -286,11 +288,11 @@ pub struct App<'a> {
     left_mouse_action: LeftMouseAction,
     ids: WidgetIds,
     ui_renderer: UiRenderer<'a>,
-    fonts: Fonts,
+    _fonts: Fonts,
     // One for editing, and one for playing
     undo_stacks: [Option<UndoStack>; 2],
     undo_stack_index: usize,
-    modifiers: ModifiersState,
+    _modifiers: ModifiersState,
 }
 
 impl<'a> App<'a> {
@@ -392,10 +394,10 @@ impl<'a> App<'a> {
             left_mouse_action: LeftMouseAction::None,
             ids: widget_ids,
             ui_renderer,
-            fonts,
+            _fonts: fonts,
             undo_stacks: [Some(UndoStack::new()), Some(UndoStack::new())],
             undo_stack_index: 0,
-            modifiers: ModifiersState::default(),
+            _modifiers: ModifiersState::default(),
         }
     }
 
@@ -714,6 +716,8 @@ impl<'a> App<'a> {
             //    self.modifiers = *state;
             //    log!("Modifiers: {:?}", self.modifiers);
             //}
+            // Until WindowEvent::ModifiersChanged gets implemeneted for web
+            #[allow(deprecated)]
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
@@ -853,29 +857,6 @@ impl<'a> App<'a> {
     }
 }
 
-/// Characters that are special in the fragment portion of a URL,
-/// as defined in https://tools.ietf.org/rfc/rfc3986.txt, page 49
-const SPECIAL_CHARS: AsciiSet = percent_encoding::NON_ALPHANUMERIC
-    .remove(b'-')
-    .remove(b'.')
-    .remove(b'_')
-    .remove(b'~')
-    .remove(b'!')
-    .remove(b'$')
-    .remove(b'&')
-    .remove(b'\'')
-    .remove(b'(')
-    .remove(b')')
-    .remove(b'*')
-    .remove(b'+')
-    .remove(b',')
-    .remove(b';')
-    .remove(b'=')
-    .remove(b':')
-    .remove(b'@')
-    .remove(b'/')
-    .remove(b'?');
-
 /// Attempts to save the grid as part of the URL's hash map, and returs whether it saved
 pub fn save_grid_in_url(grid: &Grid<Gadget>) -> bool {
     let (base64, padding) = bit_serde::to_base64(grid)
@@ -883,7 +864,7 @@ pub fn save_grid_in_url(grid: &Grid<Gadget>) -> bool {
             elog!("Grid failed to save: {}", e);
             e
         })
-        .unwrap_or_else(|e| (String::new(), 0));
+        .unwrap_or_else(|_e| (String::new(), 0));
 
     if base64.is_empty() {
         window().location().set_hash("").unwrap();
@@ -961,6 +942,8 @@ pub fn main_js() -> Result<(), JsValue> {
     let gl = {
         #[cfg(target_arch = "wasm32")]
         let gl = {
+            use wasm_bindgen::JsCast;
+
             let canvas = window.canvas();
             // winit 0.22 sets the width and height via style,
             // which overrides the style "canvas".
@@ -968,7 +951,7 @@ pub fn main_js() -> Result<(), JsValue> {
             let style = canvas.style();
             style.remove_property("width").unwrap();
             style.remove_property("height").unwrap();
-            style.set_property("cursor", "auto");
+            style.set_property("cursor", "auto").unwrap();
 
             web_sys::window()
                 .unwrap()
@@ -1065,8 +1048,4 @@ pub fn main_js() -> Result<(), JsValue> {
 
 fn window() -> web_sys::Window {
     web_sys::window().expect("No window!")
-}
-
-fn fake_panic() {
-    unreachable!();
 }

@@ -2,8 +2,9 @@ use cgmath::BaseNum;
 use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 use std::ops::Neg;
 
-pub const TAUf32: f32 = std::f32::consts::PI * 2.0;
-pub const TAUf64: f64 = std::f64::consts::PI * 2.0;
+#[allow(dead_code)]
+pub const TAU_F32: f32 = std::f32::consts::PI * 2.0;
+pub const TAU_F64: f64 = std::f64::consts::PI * 2.0;
 
 pub type Vec2i = Vector2<isize>;
 pub type Vec2 = Vector2<f64>;
@@ -12,6 +13,7 @@ pub type Vec4 = Vector4<f64>;
 pub type Mat4 = Matrix4<f64>;
 pub type Pt3 = Point3<f64>;
 pub type Degrees = Deg<f64>;
+#[allow(dead_code)]
 pub type Radians = Rad<f64>;
 
 pub trait Vector2Ex<S: BaseNum + Neg> {

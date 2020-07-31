@@ -1,14 +1,14 @@
-use cgmath::{vec2, vec3, vec4, Vector2, Vector3, Vector4};
+use cgmath::{vec3, vec4, Vector3, Vector4};
 use fnv::FnvHashMap;
-use golem::Dimension::{D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{Context, ShaderDescription, ShaderProgram};
+
+use golem::{UniformValue};
+use golem::{Context, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use ref_thread_local::{ref_thread_local, RefThreadLocal};
 use std::rc::Rc;
 
-use super::{Camera, ShaderType, SHADERS};
-use crate::log;
+use super::{Camera, ShaderType, SHADERS, GadgetRenderInfo};
+use crate::shape::{Circle, Shape};
 use crate::math::{Mat4, Vec3};
 use crate::static_map::StaticMap;
 
@@ -301,6 +301,7 @@ impl<'a> Drop for InstancedRenderingModel<'a> {
 pub enum TrianglesType {
     Agent,
     GadgetRectangle,
+    PortCircle,
     SelectionMark,
     Undo,
     Select,
@@ -346,6 +347,11 @@ fn triangles_map(_: ()) -> TrianglesMap {
                 ],
                 vec![0, 1, 2, 2, 3, 0],
             )),
+        ),
+        (
+            TrianglesType::PortCircle,
+            Rc::new(Circle::new(0.0, 0.0, GadgetRenderInfo::PORT_Z, GadgetRenderInfo::PORT_RADIUS)
+                .triangles(GadgetRenderInfo::PORT_COLOR)),
         ),
         (
             TrianglesType::SelectionMark,
@@ -421,6 +427,7 @@ pub enum ModelType {
     Agent,
     GadgetRectangleInstanced,
     SelectionMarkInstanced,
+    PortCircleInstanced,
     Undo,
     Select,
     Pan,
@@ -468,6 +475,14 @@ fn model_map(gl: &Context) -> ModelMap {
                 gl,
                 &SHADERS.borrow()[ShaderType::ScaleOffset],
                 &TRIANGLESES.borrow()[TrianglesType::SelectionMark],
+            )),
+        ),
+        (
+            ModelType::PortCircleInstanced,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Offset],
+                &TRIANGLESES.borrow()[TrianglesType::PortCircle],
             )),
         ),
         (

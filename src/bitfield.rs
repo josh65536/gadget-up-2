@@ -20,14 +20,17 @@ macro_rules! bitfield {
 
     (impl $name:ident as $prim:ident { $($fields:tt)* }) => {
         impl $name {
+            #[allow(dead_code)]
             pub fn new() -> Self {
                 Self(0)
             }
 
+            #[allow(dead_code)]
             pub fn zero() -> Self {
                 Self(0)
             }
 
+            #[allow(dead_code)]
             pub fn is_zero(self) -> bool {
                 self.0 == 0
             }
@@ -45,14 +48,17 @@ macro_rules! bitfield {
     (fields $name:ident as $prim:ident {} ) => {};
 
     (field $name:ident as $prim:ident { $field:ident, $get:ident, $set:ident: $bit:literal }) => {
+        #[allow(dead_code)]
         pub fn $field(self) -> Self {
             Self(self.0 | ((1 as $prim) << $bit))
         }
 
+        #[allow(dead_code)]
         pub fn $get(self) -> bool {
             (self.0 >> $bit & 1) != 0
         }
 
+        #[allow(dead_code)]
         pub fn $set(&mut self, value: bool) {
             self.0 = self.0 & !((1 as $prim) << $bit) | ((value as $prim) << $bit)
         }

@@ -1,8 +1,8 @@
 use cgmath::prelude::*;
-use cgmath::{vec2, vec3, Vector3, Vector4};
+use cgmath::{vec3, Vector3, Vector4};
 use itertools::izip;
 
-use crate::math::TAUf64;
+use crate::math::TAU_F64;
 use crate::math::{Vec2, Vector2Ex};
 use crate::render::{Triangles, Vertex};
 
@@ -93,9 +93,9 @@ impl Shape for Circle {
         (0..Self::RESOLUTION)
             .map(|i| {
                 vec3(
-                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x)
+                    ((TAU_F64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x)
                         as f32,
-                    ((TAUf64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y)
+                    ((TAU_F64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y)
                         as f32,
                     self.z as f32,
                 )
@@ -130,6 +130,7 @@ pub struct Path {
     closed: bool,
 }
 
+#[allow(dead_code)]
 impl Path {
     pub fn new(xys: Vec<Vec2>, z: f64, thickness: f64, closed: bool) -> Self {
         Self {

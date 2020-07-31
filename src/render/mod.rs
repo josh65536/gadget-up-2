@@ -13,18 +13,18 @@ pub use shader::{ShaderType, SHADERS};
 pub use texture::{TextureType, TEXTURES};
 pub use ui::UiRenderer;
 
-use crate::gadget::Gadget;
-use crate::grid::{Grid, GridItem, WH, XY};
 
-use crate::log;
-use crate::shape::{Rectangle, Shape};
+use crate::grid::{Grid, GridItem, XY};
 
-use golem::Dimension::{D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{Context, ShaderDescription, ShaderProgram};
-use golem::{ElementBuffer, GeometryMode, VertexBuffer};
-use itertools::izip;
-use std::rc::Rc;
+
+
+
+
+
+
+
+
+
 
 /// Takes a grid and renders it. Assumes the grid is on the XY plane,
 /// with X in the grid pointing in the X direction
@@ -48,10 +48,10 @@ pub fn render_grid<T: GridItem, R>(
     let width = 2.0 / ortho.x.x as f64;
     let height = 2.0 / ortho.y.y as f64;
 
-    let min_x = center.x as f64 - width / 2.0;
-    let max_x = center.x as f64 + width / 2.0;
-    let min_y = center.y as f64 - height / 2.0;
-    let max_y = center.y as f64 + height / 2.0;
+    let min_x = (center.x - xy.x as f64) - width / 2.0;
+    let max_x = (center.x - xy.x as f64) + width / 2.0;
+    let min_y = (center.y - xy.y as f64) - height / 2.0;
+    let max_y = (center.y - xy.y as f64) + height / 2.0;
 
     r.begin();
 

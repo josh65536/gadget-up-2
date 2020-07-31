@@ -1,19 +1,17 @@
-use cgmath::prelude::*;
-use cgmath::{vec2, vec3, vec4};
+use cgmath::{vec2};
 use fnv::{FnvHashMap, FnvHashSet};
-use golem::Context;
-use ref_thread_local::RefThreadLocal;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::{Cell, Ref, RefCell};
 use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
 
 use crate::grid::{Grid, GridItem, WH, XY};
-use crate::log;
-use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
-use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
-use crate::render::{GadgetRenderInfo, ModelType, MODELS, SHADERS, TRIANGLESES};
-use crate::shape::{Circle, Path, Rectangle, Shape};
+
+use crate::math::{Vec2, Vec2i, Vector2Ex};
+
+use crate::render::{GadgetRenderInfo};
+
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -47,6 +45,7 @@ pub type PP = (Port, Port);
 pub type SPSP = (SP, SP);
 
 /// Helper macro for defining (port, port) combinations.
+#[allow(unused_macros)]
 macro_rules! sp_multi {
     ($(($s:expr, $p:expr)),* $(,)?) => {
         [$(($crate::gadget::State($s), $crate::gadget::Port($p))),*].iter().copied()
@@ -54,6 +53,7 @@ macro_rules! sp_multi {
 }
 
 /// Helper macro for defining (state, port) traversals.
+#[allow(unused_macros)]
 macro_rules! pp_multi {
     ($(($p0:expr, $p1:expr)),* $(,)?) => {
         [$(($crate::gadget::Port($p0), $crate::gadget::Port($p1))),*].iter().copied()
@@ -534,7 +534,7 @@ impl Serialize for Grid<Gadget> {
         let mut defs_inv = FnvHashMap::default();
         let mut gadgets = vec![];
 
-        for (gadget, xy, wh) in self.iter() {
+        for (gadget, xy, _wh) in self.iter() {
             let gadget = gadget.get_serializable(&mut defs, &mut defs_inv);
             gadgets.push((gadget, (xy.x, xy.y)));
         }

@@ -1,28 +1,27 @@
-use cgmath::{vec2, vec3, vec4};
-use conrod_core::graph::Node;
+use cgmath::{vec3, vec4};
+
 use conrod_core::render::{Primitive, PrimitiveKind};
 use conrod_core::text::GlyphCache;
 use conrod_core::utils;
 use conrod_core::{Ui, Widget};
-use golem::Dimension::{D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{ColorFormat, Context, ShaderDescription, ShaderProgram};
+
+use golem::{UniformValue};
+use golem::{ColorFormat, Context, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
-use itertools::izip;
+
 use ref_thread_local::RefThreadLocal;
 use std::rc::Rc;
 
 use super::texture::{GLYPH_CACHE_HEIGHT, GLYPH_CACHE_WIDTH};
 use super::texture::{GLYPH_CACHE_OFFSET_X, GLYPH_CACHE_OFFSET_Y};
 use super::texture::{MAIN_TEXTURE_HEIGHT, MAIN_TEXTURE_WIDTH};
-use super::{Camera, TrianglesEx, TrianglesType, VertexEx, TRIANGLESES};
+use super::{Camera, TrianglesEx, VertexEx};
 use super::{ShaderType, TextureType, SHADERS, TEXTURES};
-use crate::log;
+
 use crate::shape::{Rectangle, Shape};
 use crate::widget::triangles3d::Triangles3d;
 
 pub struct UiRenderer<'a> {
-    gl: Rc<Context>,
     glyph_cache: GlyphCache<'a>,
     pub camera: Camera,
     program: Rc<ShaderProgram>,
@@ -49,7 +48,6 @@ impl<'a> UiRenderer<'a> {
         );
 
         Self {
-            gl: Rc::clone(gl),
             glyph_cache: GlyphCache::builder()
                 .dimensions(GLYPH_CACHE_WIDTH as u32, GLYPH_CACHE_HEIGHT as u32)
                 .build(),
@@ -106,12 +104,12 @@ impl<'a> UiRenderer<'a> {
         }
     }
 
-    pub fn primitive(&mut self, p: Primitive, ui: &Ui) {
-        let Primitive { id, kind, rect, .. } = p;
+    pub fn primitive(&mut self, p: Primitive, _ui: &Ui) {
+        let Primitive { id: _, kind, rect, .. } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
 
-        let mut z = Self::UI_Z_BASE as f32 + if self.floating { -0.01 } else { 0.0 };
+        let z = Self::UI_Z_BASE as f32 + if self.floating { -0.01 } else { 0.0 };
 
         // Because the model widgets render with different depth,
         // add a hack here for floating widgets.

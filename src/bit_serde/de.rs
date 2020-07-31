@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use serde::de::{self, DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess};
+use serde::de::{self, DeserializeSeed, EnumAccess, MapAccess};
 use serde::de::{SeqAccess, VariantAccess, Visitor};
 use serde::Deserialize;
 
@@ -134,49 +134,49 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_i64(self.parse_int()? as i64)
     }
 
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("f32".to_string()))
     }
 
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("f64".to_string()))
     }
 
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("char".to_string()))
     }
 
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_str<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("str".to_string()))
     }
 
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_string<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("string".to_string()))
     }
 
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("bytes".to_string()))
     }
 
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -202,14 +202,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_unit()
     }
 
-    fn deserialize_unit_struct<V>(self, name: &'static str, visitor: V) -> Result<V::Value>
+    fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.deserialize_unit(visitor)
     }
 
-    fn deserialize_newtype_struct<V>(self, name: &'static str, visitor: V) -> Result<V::Value>
+    fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -235,7 +235,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_tuple_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         len: usize,
         visitor: V,
     ) -> Result<V::Value>
@@ -255,7 +255,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value>
@@ -267,8 +267,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
-        variants: &'static [&'static str],
+        _name: &'static str,
+        _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value>
     where
@@ -285,14 +285,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.deserialize_u32(visitor)
     }
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         Err(Error::Unsupported("deserializing any".to_string()))
     }
 
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {

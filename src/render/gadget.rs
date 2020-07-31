@@ -1,24 +1,25 @@
 use super::{Camera, ShaderType, TrianglesEx, TrianglesType, SHADERS, TRIANGLESES};
 use super::{Model, ModelType, Triangles, Vertex, MODELS};
 use crate::gadget::{Agent, Gadget, PP};
-use crate::grid::{Grid, WH, XY};
-use crate::log;
-use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
-use crate::shape::{Circle, Path, Rectangle, Shape};
+use crate::grid::{WH, XY};
 
-use cgmath::{vec2, vec3, vec4};
+use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
+use crate::shape::{Circle, Path, Shape};
+
+use cgmath::{vec2, vec3, vec4, Vector4};
 use fnv::FnvHashMap;
-use golem::Dimension::{D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
-use golem::{Context, ShaderDescription, ShaderProgram};
+
+use golem::{UniformValue};
+use golem::{Context, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
-use itertools::izip;
+
 use ref_thread_local::RefThreadLocal;
 use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 
 pub struct GadgetRenderInfo {
     triangles: Triangles,
+    port_triangles: Triangles,
     paths: FnvHashMap<PP, Path>,
     /// Cached model
     model: RefCell<Option<Model>>,
@@ -26,24 +27,32 @@ pub struct GadgetRenderInfo {
 
 impl GadgetRenderInfo {
     pub const RECTANGLE_Z: f64 = -0.001;
-    const OUTLINE_Z: f64 = -0.002;
-    const PATH_Z: f64 = -0.003;
-    const PORT_Z: f64 = -0.004;
+    pub const OUTLINE_Z: f64 = -0.002;
+    pub const PATH_Z: f64 = -0.003;
+    pub const PORT_Z: f64 = -0.004;
+    pub const PORT_RADIUS: f64 = 0.05;
+    pub const PORT_COLOR: Vector4<f32> = vec4(0.0, 0.0, 0.75, 1.0);
 
     pub fn triangles(&self) -> &Triangles {
         &self.triangles
+    }
+
+    pub fn port_triangles(&self) -> &Triangles {
+        &self.port_triangles
     }
 
     /// Returns the model for this gadget, if it changed
     pub fn model(&self, gl: &Context) -> Ref<Model> {
         {
             let mut model = self.model.borrow_mut();
+            let mut triangles = self.triangles().clone();
+            triangles.append(self.port_triangles().clone());
 
             if model.is_none() {
                 *model = Some(Model::new(
                     gl,
                     &SHADERS.borrow()[ShaderType::Basic],
-                    &self.triangles,
+                    &triangles,
                 ));
             }
         }
@@ -53,6 +62,7 @@ impl GadgetRenderInfo {
     pub(crate) fn new() -> Self {
         Self {
             triangles: Triangles::new(vec![], vec![]),
+            port_triangles: Triangles::new(vec![], vec![]),
             paths: FnvHashMap::default(),
             model: RefCell::new(None),
         }
@@ -111,6 +121,7 @@ impl GadgetRenderInfo {
     /// that it is correct when rendering
     pub(crate) fn update(&mut self, gadget: &Gadget) {
         self.triangles.clear();
+        self.port_triangles.clear();
         self.paths.clear();
         *self.model.borrow_mut() = None;
 
@@ -129,7 +140,7 @@ impl GadgetRenderInfo {
         // Port circles
         let port_positions = gadget.port_positions();
         for vec in port_positions.iter() {
-            self.triangles.append(
+            self.port_triangles.append(
                 Circle::new(vec.x, vec.y, GadgetRenderInfo::PORT_Z, 0.05)
                     .triangles(vec4(0.0, 0.0, 0.75, 1.0)),
             );
@@ -208,6 +219,7 @@ impl Clone for GadgetRenderInfo {
     fn clone(&self) -> Self {
         Self {
             triangles: self.triangles.clone(),
+            port_triangles: self.port_triangles.clone(),
             paths: self.paths.clone(),
             model: RefCell::new(None),
         }
@@ -229,41 +241,54 @@ pub trait GridItemRenderer {
 
 pub struct GadgetRenderer {
     program: Rc<ShaderProgram>,
-    gl: Rc<Context>,
     /// Extra attributes: offset (vec3)
     triangles: TrianglesEx<[f32; 3]>,
-    background: Rc<Model>,
     vertex_buffer: VertexBuffer,
     index_buffer: ElementBuffer,
     /// For the background
-    instance_buffer: VertexBuffer,
-    instance_positions: Vec<f32>,
+    background: Rc<Model>,
+    bg_instance_buffer: VertexBuffer,
+    bg_instance_positions: Vec<f32>,
+    /// For the ports
+    port: Rc<Model>,
+    port_instance_buffer: VertexBuffer,
+    port_instance_positions: Vec<f32>,
 }
 
 impl GadgetRenderer {
     pub fn new(gl: &Rc<Context>) -> Self {
         Self {
             program: Rc::clone(&SHADERS.borrow()[ShaderType::Offset]),
-            gl: Rc::clone(gl),
             triangles: TrianglesEx::default(),
-            background: Rc::clone(&MODELS.borrow()[ModelType::GadgetRectangleInstanced]),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
-            instance_buffer: VertexBuffer::new(gl).unwrap(),
-            instance_positions: vec![],
+            background: Rc::clone(&MODELS.borrow()[ModelType::GadgetRectangleInstanced]),
+            bg_instance_buffer: VertexBuffer::new(gl).unwrap(),
+            bg_instance_positions: vec![],
+            port: Rc::clone(&MODELS.borrow()[ModelType::PortCircleInstanced]),
+            port_instance_buffer: VertexBuffer::new(gl).unwrap(),
+            port_instance_positions: vec![],
         }
     }
 
     pub fn render_gadget(&mut self, gadget: &Gadget, position: XY, _size: WH, z: f64) {
         let x = position.x as f32;
         let y = position.y as f32;
+        let z = z as f32;
 
         self.triangles.append(
             gadget
                 .renderer()
                 .triangles()
                 .clone()
-                .with_extra([x, y, z as f32]),
+                .with_extra([x, y, z]),
+        );
+
+        self.port_instance_positions.extend(
+            gadget
+                .port_positions()
+                .into_iter()
+                .flat_map(|vec| vec![vec.x as f32 + x, vec.y as f32 + y, z])
         );
     }
 }
@@ -274,7 +299,8 @@ impl GridItemRenderer for GadgetRenderer {
     /// Start the rendering of the grid
     fn begin(&mut self) {
         self.triangles.clear();
-        self.instance_positions.clear();
+        self.bg_instance_positions.clear();
+        self.port_instance_positions.clear();
     }
 
     /// Render a specific item
@@ -284,7 +310,7 @@ impl GridItemRenderer for GadgetRenderer {
         } else {
             let x = position.x as f32;
             let y = position.y as f32;
-            self.instance_positions.extend_from_slice(&[
+            self.bg_instance_positions.extend_from_slice(&[
                 x,
                 y,
                 (z + GadgetRenderInfo::RECTANGLE_Z) as f32,
@@ -314,13 +340,22 @@ impl GridItemRenderer for GadgetRenderer {
             .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
         self.index_buffer.set_data(&self.triangles.indexes());
 
-        if self.instance_positions.len() > 0 {
-            self.instance_buffer.set_data(&self.instance_positions);
+        if self.bg_instance_positions.len() > 0 {
+            self.bg_instance_buffer.set_data(&self.bg_instance_positions);
 
             // Same program; transform already set
             self.background
-                .prepare_render_instanced(&self.instance_buffer, &["v_offset"])
-                .render_raw(self.instance_positions.len() as i32 / 3);
+                .prepare_render_instanced(&self.bg_instance_buffer, &["v_offset"])
+                .render_raw(self.bg_instance_positions.len() as i32 / 3);
+        }
+
+        if self.port_instance_positions.len() > 0 {
+            self.port_instance_buffer.set_data(&self.port_instance_positions);
+
+            // Same program again; transform already set
+            self.port
+                .prepare_render_instanced(&self.port_instance_buffer, &["v_offset"])
+                .render_raw(self.port_instance_positions.len() as i32 / 3);
         }
 
         unsafe {

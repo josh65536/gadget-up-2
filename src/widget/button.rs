@@ -3,14 +3,14 @@ use conrod_core::position::{self, Align, Place};
 use conrod_core::widget::bordered_rectangle;
 use conrod_core::widget::{self, BorderedRectangle, Common, CommonBuilder, Text};
 use conrod_core::widget_ids;
-use conrod_core::{color, text};
-use conrod_core::{Color, FontSize, Labelable, Positionable, Scalar, Sizeable, Widget};
-use conrod_core::{Borderable, Colorable};
+use conrod_core::{text};
+use conrod_core::{Color, FontSize, Positionable, Scalar, Sizeable, Widget};
+use conrod_core::{Colorable};
 use conrod_derive::WidgetStyle;
 use std::ops::{Deref, DerefMut};
 
 use super::triangles3d::Triangles3d;
-use crate::log;
+
 
 pub struct Button<'a, S> {
     inner: widget::Button<'a, S>,

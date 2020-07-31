@@ -1,8 +1,8 @@
 use fnv::FnvHashMap;
 use golem::Dimension::{D2, D3, D4};
-use golem::{Attribute, AttributeType, Uniform, UniformType, UniformValue};
+use golem::{Attribute, AttributeType, Uniform, UniformType};
 use golem::{Context, ShaderDescription, ShaderProgram};
-use golem::{ElementBuffer, GeometryMode, VertexBuffer};
+
 use ref_thread_local::ref_thread_local;
 use std::rc::Rc;
 

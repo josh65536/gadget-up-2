@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use golem::{ColorFormat, Context, Texture};
-use ref_thread_local::{ref_thread_local, RefThreadLocal};
+use ref_thread_local::ref_thread_local;
 
 use crate::static_map::StaticMap;
 

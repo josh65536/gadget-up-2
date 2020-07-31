@@ -1,25 +1,25 @@
 use cgmath::vec2;
 use conrod_core::color;
-use conrod_core::position::{Align, Place, Relative};
+
 use conrod_core::render::PrimitiveWalker;
-use conrod_core::widget::text::{self, Text};
+use conrod_core::widget::text::{Text};
 use conrod_core::widget::Canvas;
-use conrod_core::widget::{self, bordered_rectangle, matrix, BorderedRectangle, List, Matrix};
+use conrod_core::widget::{bordered_rectangle, BorderedRectangle, List};
 use conrod_core::widget_ids;
 use conrod_core::{Borderable, Color, Colorable, Positionable, Sizeable, Theme, Widget};
 use conrod_core::{Ui, UiCell};
 use ref_thread_local::RefThreadLocal;
 
 use crate::gadget::Agent;
-use crate::log;
-use crate::math::Vec2i;
-use crate::render::{Model, ModelType, ShaderType, TrianglesEx, TrianglesType, MODELS};
-use crate::render::{SHADERS, TRIANGLESES};
+
+
+use crate::render::TrianglesType;
+use crate::render::{TRIANGLESES};
 use crate::widget::button;
 use crate::widget::screen::SelectFunc;
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
-use crate::UndoAction;
+
 
 widget_ids! {
     pub struct WidgetIds {
@@ -146,7 +146,8 @@ impl<'a> App<'a> {
                         {
                             self.remove_gadget_from_grid(xy);
                         } else {
-                            self.add_gadget_to_grid(gadget.clone(), xy);
+                            let clone = gadget.clone();
+                            self.add_gadget_to_grid(clone, xy);
                         }
                     }
                 }

@@ -12,7 +12,7 @@ mod ser;
 
 use bitvec::prelude::*;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 
 pub use de::{from_bits, Deserializer};
 pub use error::{Error, Result};
@@ -36,20 +36,20 @@ const fn base64_map_inv_() -> [u8; 128] {
     }
 
     let mut inv_map = [0; 128];
-    assign!(base64_map, inv_map);
+    assign!(BASE64_MAP, inv_map);
     inv_map
 }
 
-const base64_map: &'static [u8] =
+const BASE64_MAP: &'static [u8] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-const base64_inv: &'static [u8] = &base64_map_inv_();
+const BASE64_INV: &'static [u8] = &base64_map_inv_();
 
 fn bits_to_base64(bitvec: &BitSlice) -> (String, usize) {
     let padding = (-(bitvec.len() as isize)).rem_euclid(6) as usize;
     let base64 = bitvec
         .chunks(6)
-        .map(|slice| base64_map[slice.load_le::<usize>()] as char)
+        .map(|slice| BASE64_MAP[slice.load_le::<usize>()] as char)
         .collect();
     (base64, padding)
 }
@@ -57,7 +57,7 @@ fn bits_to_base64(bitvec: &BitSlice) -> (String, usize) {
 fn base64_to_bits(s: &str, padding: usize) -> BitVec {
     let mut bitvec = s
         .chars()
-        .flat_map(|c| &base64_inv[c as usize].bits::<Lsb0>()[..6])
+        .flat_map(|c| &BASE64_INV[c as usize].bits::<Lsb0>()[..6])
         .copied()
         .collect::<BitVec>();
     bitvec.truncate(bitvec.len() - padding);
@@ -82,6 +82,7 @@ mod test {
     use super::*;
     use serde::de::DeserializeOwned;
     use std::fmt::Debug;
+    use serde::Deserialize;
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     enum Enum {

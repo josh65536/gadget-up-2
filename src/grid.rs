@@ -9,7 +9,7 @@ pub type XY = Vec2i;
 pub type WH = (usize, usize);
 
 pub trait GridItem {
-    fn rotate_in_grid(self, turns: isize) -> Self
+    fn rotate_in_grid(self, _turns: isize) -> Self
     where
         Self: Sized,
     {

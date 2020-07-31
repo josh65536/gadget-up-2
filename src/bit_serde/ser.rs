@@ -97,25 +97,25 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         (if v < 0 { !v } else { v } as u64).serialize(self)
     }
 
-    fn serialize_f32(self, v: f32) -> Result<()> {
+    fn serialize_f32(self, _v: f32) -> Result<()> {
         Err(Error::Unsupported("f32".to_string()))
     }
 
-    fn serialize_f64(self, v: f64) -> Result<()> {
+    fn serialize_f64(self, _v: f64) -> Result<()> {
         Err(Error::Unsupported("f64".to_string()))
     }
 
-    fn serialize_char(self, v: char) -> Result<()> {
+    fn serialize_char(self, _v: char) -> Result<()> {
         Err(Error::Unsupported("char".to_string()))
     }
 
-    fn serialize_str(self, v: &str) -> Result<()> {
+    fn serialize_str(self, _v: &str) -> Result<()> {
         Err(Error::Unsupported("str".to_string()))
     }
 
     /// First the length, then the elements are
     /// stored in order, each byte in LSB-MSB order
-    fn serialize_bytes(self, v: &[u8]) -> Result<()> {
+    fn serialize_bytes(self, _v: &[u8]) -> Result<()> {
         Err(Error::Unsupported("bytes".to_string()))
         //v.len().serialize(&mut *self)?;
         //self.buffer.extend(v.iter().flat_map(|b| b.bits::<Lsb0>().iter().copied()));
@@ -143,7 +143,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    fn serialize_unit_struct(self, name: &'static str) -> Result<()> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<()> {
         self.serialize_unit()
     }
 
@@ -151,14 +151,14 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     /// to know the exact number of bits to use, but alas.
     fn serialize_unit_variant(
         self,
-        name: &'static str,
+        _name: &'static str,
         variant_index: u32,
-        variant: &'static str,
+        _variant: &'static str,
     ) -> Result<()> {
         variant_index.serialize(self)
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(self, name: &'static str, value: &T) -> Result<()>
+    fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<()>
     where
         T: Serialize,
     {
@@ -168,9 +168,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     /// Variant index, then value. Enum size, please?
     fn serialize_newtype_variant<T: ?Sized>(
         self,
-        name: &'static str,
+        _name: &'static str,
         variant_index: u32,
-        variant: &'static str,
+        _variant: &'static str,
         value: &T,
     ) -> Result<()>
     where
@@ -192,13 +192,13 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     /// The length is constant because this is a tuple.
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
         Ok(self)
     }
 
     fn serialize_tuple_struct(
         self,
-        name: &'static str,
+        _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct> {
         self.serialize_tuple(len)
@@ -207,9 +207,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     /// Variant index, followed by tuple
     fn serialize_tuple_variant(
         self,
-        name: &'static str,
+        _name: &'static str,
         variant_index: u32,
-        variant: &'static str,
+        _variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         variant_index.serialize(&mut *self)?;
@@ -226,7 +226,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     /// A struct is a tuple
-    fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.serialize_tuple(len)
     }
 
@@ -235,7 +235,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self,
         name: &'static str,
         variant_index: u32,
-        variant: &'static str,
+        _variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         variant_index.serialize(&mut *self)?;
@@ -335,7 +335,7 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
     where
         T: Serialize,
     {
@@ -351,7 +351,7 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
     where
         T: Serialize,
     {
