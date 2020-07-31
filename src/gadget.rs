@@ -371,13 +371,15 @@ impl Gadget {
 
     /// Twists the bottom-right ports
     pub fn twist_bottom_right(&mut self) {
+        self.dirty.set(true);
+
         let t0 = self.size.0 - 1;
         let t1 = self.size.0;
 
         for idx in self.port_map.iter_mut() {
             *idx = match *idx {
-                t0 => t1,
-                t1 => t0,
+                _ if *idx == t0 => t1,
+                _ if *idx == t1 => t0,
                 _ => *idx,
             }
         }

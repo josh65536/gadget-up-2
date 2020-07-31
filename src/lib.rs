@@ -819,8 +819,6 @@ impl<'a> App<'a> {
                                 }
 
                                 undo_stack.batch();
-
-                                save_grid_in_url(&self.grid);
                             }
                         }
                     }

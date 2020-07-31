@@ -438,6 +438,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(!self.selection.is_empty())
             .tooltip_text("Cut (Ctrl + X)"),
             &mut ui,
         ) {
@@ -457,6 +458,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(!self.selection.is_empty())
             .tooltip_text("Copy (Ctrl + C)"),
             &mut ui,
         ) {
@@ -476,6 +478,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(!self.paste.is_empty())
             .tooltip_text("Paste (Ctrl + V)"),
             &mut ui,
         ) {
@@ -514,6 +517,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint || self.mode == Mode::AgentPlace ||
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Rotate Counterclockwise (R)"),
             &mut ui,
         ) {
@@ -533,6 +538,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint || self.mode == Mode::AgentPlace ||
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Rotate Clockwise (T)"),
             &mut ui,
         ) {
@@ -552,6 +559,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint || 
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Flip X (X)"),
             &mut ui,
         ) {
@@ -571,6 +580,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint || 
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Flip Y (Y)"),
             &mut ui,
         ) {
@@ -590,6 +601,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint)
             .tooltip_text("Twist (U)"),
             &mut ui,
         ) {
@@ -609,6 +621,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .enabled(self.mode == Mode::TilePaint)
             .tooltip_text("Cycle State (C)"),
             &mut ui,
         ) {
