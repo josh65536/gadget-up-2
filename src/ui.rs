@@ -86,6 +86,8 @@ impl<'a> App<'a> {
             if mode == Mode::Play {
                 self.undo_stack_index = 1;
                 self.undo_stack_mut().clear();
+
+                self.left_mouse_action = LeftMouseAction::Pan;
             }
 
             // Play time's over! Move the entire play history to the main stack as a single batch
@@ -601,7 +603,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint)
+            .enabled(self.mode == Mode::TilePaint || 
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Twist (U)"),
             &mut ui,
         ) {
@@ -621,7 +624,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint)
+            .enabled(self.mode == Mode::TilePaint || 
+                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
             .tooltip_text("Cycle State (C)"),
             &mut ui,
         ) {

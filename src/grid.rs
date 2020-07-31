@@ -84,6 +84,10 @@ impl<T: GridItem> Grid<T> {
         self.items.values()
     }
 
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&mut T, XY, WH)> {
+        self.items.values_mut().map(|(t, xy, wh)| (t, *xy, *wh))
+    }
+
     pub fn get_in_bounds(
         &self,
         min_x: f64,

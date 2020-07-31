@@ -388,7 +388,7 @@ impl<'a> App<'a> {
             moving: Grid::new(),
             paste: Grid::new(),
             paste_renderer,
-            mode: Mode::None,
+            mode: Mode::Select,
             left_mouse_action: LeftMouseAction::None,
             ids: widget_ids,
             ui_renderer,
@@ -542,11 +542,35 @@ impl<'a> App<'a> {
         if let Some(gadget) = &mut self.gadget_tile {
             gadget.twist_bottom_right();
         }
+
+        if self.mode == Mode::GadgetMove {
+            for (gadget, _, _) in self.moving.iter_mut() {
+                gadget.twist_bottom_right();
+            }
+        }
+
+        if self.mode == Mode::GadgetPaste {
+            for (gadget, _, _) in self.paste.iter_mut() {
+                gadget.twist_bottom_right();
+            }
+        }
     }
 
     pub fn cycle_state_active(&mut self) {
         if let Some(gadget) = &mut self.gadget_tile {
             gadget.cycle_state();
+        }
+
+        if self.mode == Mode::GadgetMove {
+            for (gadget, _, _) in self.moving.iter_mut() {
+                gadget.cycle_state();
+            }
+        }
+
+        if self.mode == Mode::GadgetPaste {
+            for (gadget, _, _) in self.paste.iter_mut() {
+                gadget.cycle_state();
+            }
         }
     }
 
@@ -772,7 +796,7 @@ impl<'a> App<'a> {
                             }
 
                             VirtualKeyCode::Escape => {
-                                if self.mode == Mode::GadgetPaste {
+                                if self.mode == Mode::GadgetPaste || self.mode == Mode::TilePaint {
                                     self.set_mode(Mode::Select);
                                 }
                             }
