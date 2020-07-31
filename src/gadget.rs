@@ -5,10 +5,10 @@ use golem::Context;
 use ref_thread_local::RefThreadLocal;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::{Cell, Ref, RefCell};
-use std::rc::Rc;
 use std::fmt::{self, Debug, Formatter};
+use std::rc::Rc;
 
-use crate::grid::{Grid, WH, XY, GridItem};
+use crate::grid::{Grid, GridItem, WH, XY};
 use crate::log;
 use crate::math::{Mat4, Vec2, Vec2i, Vector2Ex};
 use crate::render::{Camera, Model, ShaderType, Triangles, TrianglesType, Vertex};
@@ -366,6 +366,20 @@ impl Gadget {
         for idx in self.port_map.iter_mut() {
             *idx = (perimeter - self.size.1 as isize - *idx as isize - 1).rem_euclid(perimeter)
                 as usize
+        }
+    }
+
+    /// Twists the bottom-right ports
+    pub fn twist_bottom_right(&mut self) {
+        let t0 = self.size.0 - 1;
+        let t1 = self.size.0;
+
+        for idx in self.port_map.iter_mut() {
+            *idx = match *idx {
+                t0 => t1,
+                t1 => t0,
+                _ => *idx,
+            }
         }
     }
 

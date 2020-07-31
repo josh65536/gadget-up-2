@@ -1,7 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{vec2, vec4, Point3, Vector2};
 
-use conrod_core::event::{Event as ConrodEvent, Input as ConrodInput};
+use conrod_core::event::{Event as ConrodEvent, Input as ConrodInput, Motion as MotionEvent, Ui};
 use conrod_core::input::widget::Mouse;
 use conrod_core::input::{ModifierKey, Motion};
 use conrod_core::widget::bordered_rectangle;
@@ -16,7 +16,7 @@ use crate::grid::XY;
 use crate::log;
 use crate::math::Vec2;
 use crate::render::Camera;
-use crate::ui::Mode;
+use crate::ui::{LeftMouseAction, Mode};
 
 widget_ids! {
     pub struct Ids {
@@ -33,6 +33,7 @@ pub struct ContraptionScreen<'a> {
     camera: &'a Camera,
     style: Style,
     mode: Mode,
+    left_mouse_action: LeftMouseAction,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, WidgetStyle)]
@@ -59,6 +60,8 @@ pub struct State {
     pressed_raw: Input,
     position: Vec2,
     prev_position: Vec2,
+    position_raw: Point,
+    prev_position_raw: Point,
     ids: Ids,
     /// To make sure we don't send a million tile paint events of the same value
     last_tile_event: Option<Event>,
@@ -69,12 +72,13 @@ pub struct State {
 impl<'a> ContraptionScreen<'a> {
     /// Constructs a new StageWidget with dimensions [width, height]
     /// and a selection cursor image
-    pub fn new(mode: Mode, camera: &'a Camera) -> Self {
+    pub fn new(mode: Mode, left_mouse_action: LeftMouseAction, camera: &'a Camera) -> Self {
         Self {
             common: widget::CommonBuilder::default(),
             style: Style::default(),
             camera,
             mode,
+            left_mouse_action,
         }
     }
 
@@ -106,6 +110,7 @@ impl<'a> ContraptionScreen<'a> {
         h: f64,
     ) {
         state.prev_input_raw = state.input_raw;
+        state.prev_position_raw = state.position_raw;
         state.prev_position = state.position;
 
         if let Some(mouse) = mouse {
@@ -113,7 +118,8 @@ impl<'a> ContraptionScreen<'a> {
             state.input_raw.set_middle(mouse.buttons.middle().is_down());
             state.input_raw.set_right(mouse.buttons.right().is_down());
 
-            state.position = Self::screen_to_world(mouse.rel_xy(), camera, w, h);
+            state.position_raw = mouse.rel_xy();
+            state.position = Self::screen_to_world(state.position_raw, camera, w, h);
         } else {
             state.input_raw.set_left(false);
             state.input_raw.set_middle(false);
@@ -180,8 +186,6 @@ impl<'a> ContraptionScreen<'a> {
                             events.push(event);
                         }
                     }
-
-                    events.push(Event::TileHover(vec2(x, y)));
                 }
             }
 
@@ -246,6 +250,7 @@ impl<'a> ContraptionScreen<'a> {
             if let Some(mouse) = ui.widget_input(id).mouse() {
                 if state.pressed.is_left() {
                     state.selection_start = state.position;
+                    events.push(Event::SelectStart(state.selection_start));
                 }
 
                 if state.input.is_left() {
@@ -285,6 +290,23 @@ impl<'a> ContraptionScreen<'a> {
         events
     }
 
+    fn update_gadget_move(self, args: widget::UpdateArgs<Self>) -> <Self as Widget>::Event {
+        let id = args.id;
+        let state = args.state;
+        let rect = args.rect;
+        let ui = args.ui;
+
+        let Self { camera: _, .. } = self;
+
+        let mut events = vec![];
+
+        if state.released.is_left() {
+            events.push(Event::GadgetMoveFinish);
+        }
+
+        events
+    }
+
     fn update_gadget_paste(self, args: widget::UpdateArgs<Self>) -> <Self as Widget>::Event {
         let id = args.id;
         let state = args.state;
@@ -306,8 +328,6 @@ impl<'a> ContraptionScreen<'a> {
                     if state.pressed.is_left() {
                         events.push(Event::GadgetPaste(vec2(x, y)));
                     }
-
-                    events.push(Event::GadgetPasteHover(vec2(x, y)));
                 }
             }
         });
@@ -332,8 +352,6 @@ pub enum SelectFunc {
 pub enum Event {
     /// Tile at (X, Y) is painted
     TilePaint(XY),
-    /// Mouse moved over (X, Y) in tile paint mode
-    TileHover(XY),
     /// Tile painting is done
     TilePaintFinish,
     /// Agent is placed at (X, Y)
@@ -344,12 +362,14 @@ pub enum Event {
     Pan(Vec2),
     /// Screen zoomed at (X, Y) by some amount
     Zoom(Vec2, f64),
+    /// Attempted to start a selection at (X, Y)
+    SelectStart(Vec2),
     /// Rectangle selection made
     Select(Rect, SelectFunc),
+    /// Finished moving gadgets
+    GadgetMoveFinish,
     /// Pasted copied selection
     GadgetPaste(XY),
-    /// Mouse moved over (X, Y) in gadget paste mode
-    GadgetPasteHover(XY),
     /// Communicates the position of the mouse in the grid
     MousePosition(Vec2),
 }
@@ -370,6 +390,8 @@ impl<'a> Widget for ContraptionScreen<'a> {
             pressed_raw: Input::zero(),
             position: vec2(0.0, 0.0),
             prev_position: vec2(0.0, 0.0),
+            position_raw: [0.0, 0.0],
+            prev_position_raw: [0.0, 0.0],
             ids: Ids::new(id_gen),
             last_tile_event: None,
             selection_start: vec2(0.0, 0.0),
@@ -401,9 +423,27 @@ impl<'a> Widget for ContraptionScreen<'a> {
                 vec.push(Event::Zoom(args.state.position, -*y / 64.0));
                 break;
             }
+
+            if let ConrodEvent::Raw(ConrodInput::Motion(Motion::MouseCursor { .. })) = event {
+                if args.state.input.is_left()
+                    && self.left_mouse_action == LeftMouseAction::Zoom
+                    && args.ui.widget_input(args.id).mouse().is_some()
+                {
+                    vec.push(Event::Zoom(
+                        Self::screen_to_world([0.0, 0.0], self.camera, rect.w(), rect.h()),
+                        (args.state.prev_position_raw[1] - args.state.position_raw[1]) / 16.0,
+                    ));
+                    break;
+                }
+            }
         }
 
-        if args.state.input.is_middle() && args.state.position != args.state.prev_position {
+        if (args.state.input.is_middle()
+            || (self.left_mouse_action == LeftMouseAction::Pan
+                && args.state.input.is_left()
+                && args.ui.widget_input(args.id).mouse().is_some()))
+            && args.state.position != args.state.prev_position
+        {
             vec.push(Event::Pan(
                 vec2(args.state.prev_position[0], args.state.prev_position[1])
                     - vec2(args.state.position[0], args.state.position[1]),
@@ -417,6 +457,7 @@ impl<'a> Widget for ContraptionScreen<'a> {
             Mode::TilePaint => self.update_paint_tile(args),
             Mode::AgentPlace => self.update_place_agent(args),
             Mode::Select => self.update_select(args),
+            Mode::GadgetMove => self.update_gadget_move(args),
             Mode::GadgetPaste => self.update_gadget_paste(args),
             _ => vec![],
         });

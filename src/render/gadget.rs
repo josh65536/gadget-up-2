@@ -355,28 +355,28 @@ impl SelectionRenderer {
         }
     }
 
-    pub fn render<'a>(
+    pub fn render(
         &mut self,
-        selection: impl IntoIterator<Item = &'a (XY, WH)>,
+        selection: impl IntoIterator<Item = (XY, WH)>,
         camera: &Camera,
+        offset: XY,
+        z: f64,
     ) {
         self.instance_data.clear();
 
         let mut count = 0;
 
         for (Vec2i { x, y }, (w, h)) in selection.into_iter() {
-            let x = *x;
-            let y = *y;
-            let w = *w as isize;
-            let h = *h as isize;
+            let w = w as isize;
+            let h = h as isize;
 
             #[rustfmt::skip]
             self.instance_data.extend_from_slice(
                 &[
-                     1.0,  1.0,  x      as f32,  y      as f32, Self::Z as f32,
-                    -1.0,  1.0, (x + w) as f32,  y      as f32, Self::Z as f32,
-                    -1.0, -1.0, (x + w) as f32, (y + h) as f32, Self::Z as f32,
-                     1.0, -1.0,  x      as f32, (y + h) as f32, Self::Z as f32,
+                     1.0,  1.0, (offset.x + x    ) as f32, (offset.y + y    ) as f32, z as f32,
+                    -1.0,  1.0, (offset.x + x + w) as f32, (offset.y + y    ) as f32, z as f32,
+                    -1.0, -1.0, (offset.x + x + w) as f32, (offset.y + y + h) as f32, z as f32,
+                     1.0, -1.0, (offset.x + x    ) as f32, (offset.y + y + h) as f32, z as f32,
                 ]
             );
 

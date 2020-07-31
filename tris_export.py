@@ -1,6 +1,6 @@
 import bpy
 
-filename = "/home/joshua/rust/gadget-up-2/assets/models/selection_mark.tris"
+filename = "/home/joshua/rust/gadget-up-2/assets/models/save.tris"
 
 obj = bpy.context.active_object
 dg = bpy.context.evaluated_depsgraph_get()

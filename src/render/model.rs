@@ -301,9 +301,20 @@ impl<'a> Drop for InstancedRenderingModel<'a> {
 pub enum TrianglesType {
     Agent,
     GadgetRectangle,
+    SelectionMark,
     Undo,
     Select,
-    SelectionMark,
+    Pan,
+    Zoom,
+    Cut,
+    Copy,
+    Paste,
+    Save,
+    Rotate,
+    FlipX,
+    FlipY,
+    Twist,
+    CycleState,
 }
 
 type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
@@ -337,6 +348,10 @@ fn triangles_map(_: ()) -> TrianglesMap {
             )),
         ),
         (
+            TrianglesType::SelectionMark,
+            Rc::new(include!("../../assets/models/selection_mark.tris")),
+        ),
+        (
             TrianglesType::Undo,
             Rc::new(include!("../../assets/models/undo.tris")),
         ),
@@ -345,8 +360,48 @@ fn triangles_map(_: ()) -> TrianglesMap {
             Rc::new(include!("../../assets/models/select.tris")),
         ),
         (
-            TrianglesType::SelectionMark,
-            Rc::new(include!("../../assets/models/selection_mark.tris")),
+            TrianglesType::Pan,
+            Rc::new(include!("../../assets/models/pan.tris")),
+        ),
+        (
+            TrianglesType::Zoom,
+            Rc::new(include!("../../assets/models/zoom.tris")),
+        ),
+        (
+            TrianglesType::Cut,
+            Rc::new(include!("../../assets/models/cut.tris")),
+        ),
+        (
+            TrianglesType::Copy,
+            Rc::new(include!("../../assets/models/copy.tris")),
+        ),
+        (
+            TrianglesType::Paste,
+            Rc::new(include!("../../assets/models/paste.tris")),
+        ),
+        (
+            TrianglesType::Save,
+            Rc::new(include!("../../assets/models/save.tris")),
+        ),
+        (
+            TrianglesType::Rotate,
+            Rc::new(include!("../../assets/models/rotate.tris")),
+        ),
+        (
+            TrianglesType::FlipX,
+            Rc::new(include!("../../assets/models/flip_x.tris")),
+        ),
+        (
+            TrianglesType::FlipY,
+            Rc::new(include!("../../assets/models/flip_y.tris")),
+        ),
+        (
+            TrianglesType::Twist,
+            Rc::new(include!("../../assets/models/twist.tris")),
+        ),
+        (
+            TrianglesType::CycleState,
+            Rc::new(include!("../../assets/models/cycle_state.tris")),
         ),
     ]
     .iter()
@@ -365,9 +420,20 @@ ref_thread_local!(
 pub enum ModelType {
     Agent,
     GadgetRectangleInstanced,
+    SelectionMarkInstanced,
     Undo,
     Select,
-    SelectionMarkInstanced,
+    Pan,
+    Zoom,
+    Cut,
+    Copy,
+    Paste,
+    Save,
+    Rotate,
+    FlipX,
+    FlipY,
+    Twist,
+    CycleState,
 }
 
 type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
@@ -397,6 +463,14 @@ fn model_map(gl: &Context) -> ModelMap {
             )),
         ),
         (
+            ModelType::SelectionMarkInstanced,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::SelectionMark],
+            )),
+        ),
+        (
             ModelType::Undo,
             Rc::new(Model::new(
                 gl,
@@ -413,11 +487,91 @@ fn model_map(gl: &Context) -> ModelMap {
             )),
         ),
         (
-            ModelType::SelectionMarkInstanced,
+            ModelType::Pan,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Pan],
+            )),
+        ),
+        (
+            ModelType::Zoom,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Zoom],
+            )),
+        ),
+        (
+            ModelType::Cut,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Cut],
+            )),
+        ),
+        (
+            ModelType::Copy,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::Basic],
+                &TRIANGLESES.borrow()[TrianglesType::Copy],
+            )),
+        ),
+        (
+            ModelType::Paste,
             Rc::new(Model::new(
                 gl,
                 &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::SelectionMark],
+                &TRIANGLESES.borrow()[TrianglesType::Paste],
+            )),
+        ),
+        (
+            ModelType::Save,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::Save],
+            )),
+        ),
+        (
+            ModelType::Rotate,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::Rotate],
+            )),
+        ),
+        (
+            ModelType::FlipX,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::FlipX],
+            )),
+        ),
+        (
+            ModelType::FlipY,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::FlipY],
+            )),
+        ),
+        (
+            ModelType::Twist,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::Twist],
+            )),
+        ),
+        (
+            ModelType::CycleState,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[TrianglesType::CycleState],
             )),
         ),
     ]

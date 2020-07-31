@@ -3,17 +3,32 @@ use fnv::FnvHashMap;
 use itertools::iproduct;
 use std::iter::{FromIterator, IntoIterator};
 
-use crate::math::{Vec2i, Vec2, Vector2Ex};
+use crate::math::{Vec2, Vec2i, Vector2Ex};
 
 pub type XY = Vec2i;
 pub type WH = (usize, usize);
 
 pub trait GridItem {
-    fn rotate_in_grid(self, turns: isize) -> Self where Self: Sized { self }
+    fn rotate_in_grid(self, turns: isize) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
 
-    fn flip_x_in_grid(self) -> Self where Self: Sized { self }
+    fn flip_x_in_grid(self) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
 
-    fn flip_y_in_grid(self) -> Self where Self: Sized { self }
+    fn flip_y_in_grid(self) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
 }
 
 /// Sparse grid for storing things that do not necessarily take up
@@ -43,10 +58,21 @@ impl<T: GridItem> Grid<T> {
         Self::default()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
     /// Gets the item at a specific position, along with that item's
     /// minimal XY coordinates and size. Width and height cannot be 0.
     pub fn get(&self, position: XY) -> Option<&(T, XY, WH)> {
         Some(&self.items[self.grid.get(&position)?])
+    }
+
+    pub fn get_f64(&self, position: Vec2) -> Option<&(T, XY, WH)> {
+        self.get(vec2(
+            position.x.floor() as isize,
+            position.y.floor() as isize,
+        ))
     }
 
     pub fn get_mut(&mut self, position: XY) -> Option<(&mut T, XY, WH)> {
@@ -141,7 +167,7 @@ impl<T: GridItem> Grid<T> {
         }
     }
 
-    pub fn extend(&mut self, iter: impl IntoIterator<Item=(T, XY, WH)>) {
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (T, XY, WH)>) {
         for (t, xy, wh) in iter.into_iter() {
             self.insert(t, xy, wh);
         }
@@ -194,7 +220,32 @@ impl<T: GridItem> Grid<T> {
 
     /// Moves the grid by some vector
     pub fn translate(self, vec: XY) -> Self {
-        self.into_iter().map(|(t, xy, wh)| (t, xy + vec, wh)).collect()
+        self.into_iter()
+            .map(|(t, xy, wh)| (t, xy + vec, wh))
+            .collect()
+    }
+
+    /// Center the bounding box of this grid at the origin
+    pub fn center(self) -> Self {
+        let first = self
+            .iter()
+            .next()
+            .map(|(_, xy, wh)| (xy.x, xy.x + wh.0 as isize, xy.y, xy.y + wh.1 as isize))
+            .unwrap_or((0, 0, 0, 0));
+
+        let (min_x, max_x, min_y, max_y) = self
+            .iter()
+            .map(|(_, xy, wh)| (xy.x, xy.x + wh.0 as isize, xy.y, xy.y + wh.1 as isize))
+            .fold(first, |(l0, r0, b0, t0), (l1, r1, b1, t1)| {
+                (l0.min(l1), r0.max(r1), b0.min(b1), t0.max(t1))
+            });
+
+        let vec = vec2(
+            -(min_x + max_x).div_euclid(2),
+            -(min_y + max_y).div_euclid(2),
+        );
+
+        self.translate(vec)
     }
 
     /// Rotates the grid around some point by some number of counterclockwise right turns.
@@ -203,33 +254,39 @@ impl<T: GridItem> Grid<T> {
         let turns = turns.rem_euclid(4);
         let center = vec2(center.x.floor() as isize, center.y.floor() as isize);
 
-        self.into_iter().map(|(t, mut xy, mut wh)| {
-            for _ in 0..turns {
-                xy = (xy - center).right_ccw() + center;
-                wh = (wh.1, wh.0);
-                xy.x = xy.x + 1 - wh.0 as isize;
-            }
+        self.into_iter()
+            .map(|(t, mut xy, mut wh)| {
+                for _ in 0..turns {
+                    xy = (xy - center).right_ccw() + center;
+                    wh = (wh.1, wh.0);
+                    xy.x = xy.x + 1 - wh.0 as isize;
+                }
 
-            (t.rotate_in_grid(turns), xy, wh)
-        }).collect()
+                (t.rotate_in_grid(turns), xy, wh)
+            })
+            .collect()
     }
 
     /// Flips the x coordinates in the grid around some x position.
     /// The axis will effecively be at some half-integer coordinate.
     pub fn flip_x(self, x: f64) -> Self {
-        self.into_iter().map(|(t, mut xy, (w, h))| {
-            xy.x = 2 * x.floor() as isize + 1 - xy.x - w as isize;
-            (t.flip_x_in_grid(), xy, (w, h))
-        }).collect()
+        self.into_iter()
+            .map(|(t, mut xy, (w, h))| {
+                xy.x = 2 * x.floor() as isize + 1 - xy.x - w as isize;
+                (t.flip_x_in_grid(), xy, (w, h))
+            })
+            .collect()
     }
 
     /// Flips the y coordinates in the grid around some y position.
     /// The axis will effecively be at some half-integer coordinate.
     pub fn flip_y(self, y: f64) -> Self {
-        self.into_iter().map(|(t, mut xy, (w, h))| {
-            xy.y = 2 * y.floor() as isize + 1 - xy.y - h as isize;
-            (t.flip_y_in_grid(), xy, (w, h))
-        }).collect()
+        self.into_iter()
+            .map(|(t, mut xy, (w, h))| {
+                xy.y = 2 * y.floor() as isize + 1 - xy.y - h as isize;
+                (t.flip_y_in_grid(), xy, (w, h))
+            })
+            .collect()
     }
 }
 
@@ -248,7 +305,10 @@ impl<T: GridItem> FromIterator<(T, XY, WH)> for Grid<T> {
 impl<T: GridItem> IntoIterator for Grid<T> {
     type Item = (T, XY, WH);
     // Oof, long type name
-    type IntoIter = std::iter::Map<<FnvHashMap<u64, (T, XY, WH)> as IntoIterator>::IntoIter, fn((u64, (T, XY, WH))) -> (T, XY, WH)>;
+    type IntoIter = std::iter::Map<
+        <FnvHashMap<u64, (T, XY, WH)> as IntoIterator>::IntoIter,
+        fn((u64, (T, XY, WH))) -> (T, XY, WH),
+    >;
 
     fn into_iter(self) -> Self::IntoIter {
         fn value<K, V>(tup: (K, V)) -> V {
@@ -304,10 +364,7 @@ mod test {
 
         let grid = grid.translate(vec2(-1, 5));
 
-        assert_eq!(
-            ("a", vec2(-2, 7), (3, 2)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(-2, 7), (3, 2)), *grid.iter().next().unwrap());
     }
 
     #[test]
@@ -317,10 +374,7 @@ mod test {
 
         let grid = grid.rotate(vec2(-0.5, 2.5), 1);
 
-        assert_eq!(
-            ("a", vec2(-2, 2), (2, 3)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(-2, 2), (2, 3)), *grid.iter().next().unwrap());
     }
 
     #[test]
@@ -330,10 +384,7 @@ mod test {
 
         let grid = grid.rotate(vec2(1.5, -1.5), 2);
 
-        assert_eq!(
-            ("a", vec2(1, -7), (3, 2)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(1, -7), (3, 2)), *grid.iter().next().unwrap());
     }
 
     #[test]
@@ -343,10 +394,7 @@ mod test {
 
         let grid = grid.rotate(vec2(-0.5, 2.5), -1);
 
-        assert_eq!(
-            ("a", vec2(-1, 0), (2, 3)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(-1, 0), (2, 3)), *grid.iter().next().unwrap());
     }
 
     #[test]
@@ -356,10 +404,7 @@ mod test {
 
         let grid = grid.flip_x(1.5);
 
-        assert_eq!(
-            ("a", vec2(1, 2), (3, 2)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(1, 2), (3, 2)), *grid.iter().next().unwrap());
     }
 
     #[test]
@@ -369,9 +414,6 @@ mod test {
 
         let grid = grid.flip_y(-0.5);
 
-        assert_eq!(
-            ("a", vec2(-1, -5), (3, 2)),
-            *grid.iter().next().unwrap()
-        );
+        assert_eq!(("a", vec2(-1, -5), (3, 2)), *grid.iter().next().unwrap());
     }
 }

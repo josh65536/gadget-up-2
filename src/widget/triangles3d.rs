@@ -93,13 +93,13 @@ impl Widget for Triangles3d {
         } = self;
 
         let (x, y, w, h) = rect.x_y_w_h();
-        let scale = (w / src_width).min(h / src_height);
+        let scale = (w / src_width.abs()).min(h / src_height.abs());
         let offset = vec2(x, y) - src_center * scale;
 
         for v in triangles.vertices_mut() {
             v.extra = [
-                scale as f32,
-                scale as f32,
+                (scale * src_width.signum()) as f32,
+                (scale * src_height.signum()) as f32,
                 offset.x as f32,
                 offset.y as f32,
                 UiRenderer::UI_Z_BASE as f32,

@@ -5,6 +5,7 @@ use conrod_core::widget::{self, BorderedRectangle, Common, CommonBuilder, Text};
 use conrod_core::widget_ids;
 use conrod_core::{color, text};
 use conrod_core::{Color, FontSize, Labelable, Positionable, Scalar, Sizeable, Widget};
+use conrod_core::{Borderable, Colorable};
 use conrod_derive::WidgetStyle;
 use std::ops::{Deref, DerefMut};
 
@@ -15,6 +16,8 @@ pub struct Button<'a, S> {
     inner: widget::Button<'a, S>,
     style: Style,
     tooltip_text: Option<&'a str>,
+    current: bool,
+    enabled: bool,
 }
 
 impl<'a, S> Common for Button<'a, S> {
@@ -83,6 +86,9 @@ widget_ids! {
         triangles,
         tooltip_rect,
         tooltip_text,
+        select_rect,
+        hover_rect,
+        disabled,
     }
 }
 
@@ -107,6 +113,8 @@ impl<'a> Button<'a, Triangles> {
             }),
             style: Style::default(),
             tooltip_text: None,
+            current: false,
+            enabled: true,
         }
     }
 
@@ -117,6 +125,16 @@ impl<'a> Button<'a, Triangles> {
 
     pub fn tooltip_text(mut self, text: &'a str) -> Self {
         self.tooltip_text = Some(text);
+        self
+    }
+
+    pub fn current(mut self, current: bool) -> Self {
+        self.current = current;
+        self
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
         self
     }
 }
@@ -186,9 +204,29 @@ impl<'a> Widget for Button<'a, Triangles> {
             }
         }
 
+        if self.current {
+            widget::Rectangle::outline_styled(
+                [rect.w(), rect.h()],
+                widget::line::Style::solid()
+                    .thickness(4.0)
+                    .color(Color::Rgba(0.5, 0.0, 0.0, 1.0)),
+            )
+            .middle_of(id)
+            .wh_of(id)
+            .graphics_for(id)
+            .set(state.select_rect, ui);
+        }
+
+        if !self.enabled {
+            widget::Line::new([rect.left(), rect.bottom()], [rect.right(), rect.top()])
+                .thickness(4.0)
+                .color(Color::Rgba(0.5, 0.0, 0.0, 1.0))
+                .set(state.disabled, ui);
+        }
+
         let (_interaction, times_triggered) =
             widget::button::interaction_and_times_triggered(id, ui);
 
-        widget::button::TimesClicked(times_triggered)
+        widget::button::TimesClicked(if self.enabled {times_triggered} else {0})
     }
 }

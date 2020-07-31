@@ -38,19 +38,44 @@ pub fn theme() -> Theme {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-// Mode of editing
+/// Mode of editing
 pub enum Mode {
     None,
     TilePaint,
     AgentPlace,
     Play,
     Select,
+    Pan,
+    Zoom,
+    GadgetMove,
     GadgetPaste,
+}
+
+/// Action to be done with the left mouse button
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum LeftMouseAction {
+    None,
+    Pan,
+    Zoom,
 }
 
 impl<'a> App<'a> {
     pub fn set_mode(&mut self, mode: Mode) {
         if mode != self.mode {
+            if mode == Mode::Pan || mode == Mode::Zoom {
+                self.left_mouse_action = match mode {
+                    Mode::Pan => LeftMouseAction::Pan,
+                    Mode::Zoom => LeftMouseAction::Zoom,
+                    _ => LeftMouseAction::None,
+                };
+
+                if self.mode == Mode::Play {
+                    return;
+                }
+            } else {
+                self.left_mouse_action = LeftMouseAction::None;
+            }
+
             // clear some fields
             if mode != Mode::TilePaint {
                 self.gadget_selection = None;
@@ -85,7 +110,7 @@ impl<'a> App<'a> {
                 self.agent = None;
             }
 
-            if mode != Mode::Select {
+            if mode != Mode::Select && mode != Mode::Pan && mode != Mode::Zoom {
                 self.selection.clear();
             }
 
@@ -102,7 +127,7 @@ impl<'a> App<'a> {
         let mut ui = ui.set_widgets();
 
         // Contraption screen
-        for event in ContraptionScreen::new(self.mode, &self.camera)
+        for event in ContraptionScreen::new(self.mode, self.left_mouse_action, &self.camera)
             .middle_of(ui.window)
             .wh_of(ui.window)
             //.x_y(0.0, 0.0)
@@ -121,12 +146,7 @@ impl<'a> App<'a> {
                         } else {
                             self.add_gadget_to_grid(gadget.clone(), xy);
                         }
-                        crate::save_grid_in_url(&self.grid);
                     }
-                }
-
-                screen::Event::TileHover(xy) => {
-                    self.gadget_tile_xy = xy;
                 }
 
                 screen::Event::TilePaintFinish => {
@@ -150,14 +170,21 @@ impl<'a> App<'a> {
                 }
 
                 screen::Event::Pan(xy) => {
-                    self.center += xy;
+                    self.pan(xy);
                 }
 
                 screen::Event::Zoom(xy, amount) => {
-                    let prev_height = self.height;
-                    self.height += amount;
-                    self.clamp_height(&ui);
-                    self.center = xy + (self.center - xy) * self.height / prev_height;
+                    self.zoom(xy, amount, &ui);
+                }
+
+                screen::Event::SelectStart(xy) => {
+                    if let Some((_, xy, wh)) = self.grid.get_f64(xy) {
+                        if self.selection.contains(&(*xy, *wh)) {
+                            self.moving = self.copy_selected_gadgets(false);
+                            self.remove_selected_gadgets();
+                            self.set_mode(Mode::GadgetMove);
+                        }
+                    }
                 }
 
                 screen::Event::Select(rect, func) => {
@@ -191,6 +218,20 @@ impl<'a> App<'a> {
                     }
                 }
 
+                screen::Event::GadgetMoveFinish => {
+                    for (t, xy, wh) in std::mem::take(&mut self.moving)
+                        .translate(self.int_mouse_position)
+                        .into_iter()
+                    {
+                        self.add_gadget_to_grid(t, xy);
+                        self.selection.insert((xy, wh));
+                    }
+                    self.undo_stack_mut().batch();
+
+                    // This should not clear the selection.
+                    self.set_mode(Mode::Select);
+                }
+
                 screen::Event::GadgetPaste(xy) => {
                     for (t, xy, _) in self.paste.clone().translate(xy) {
                         self.add_gadget_to_grid(t, xy);
@@ -198,12 +239,11 @@ impl<'a> App<'a> {
                     self.undo_stack_mut().batch();
                 }
 
-                screen::Event::GadgetPasteHover(xy) => {
-                    self.paste_xy = xy;
-                }
-
                 screen::Event::MousePosition(position) => {
                     self.grid_mouse_position = position;
+
+                    self.int_mouse_position =
+                        vec2(position.x.floor() as isize, position.y.floor() as isize);
                 }
             }
         }
@@ -231,7 +271,7 @@ impl<'a> App<'a> {
             .wh_of(self.ids.header)
             .set(self.ids.menu, &mut ui);
 
-        let (mut items, _) = List::flow_right(5)
+        let (mut items, _) = List::flow_right(17)
             .middle_of(self.ids.menu)
             .wh_of(self.ids.menu)
             .set(self.ids.menu_list, &mut ui);
@@ -253,6 +293,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .current(self.mode == Mode::TilePaint)
             .tooltip_text("Select gadget"),
             &mut ui,
         ) {
@@ -272,6 +313,7 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .current(self.mode == Mode::AgentPlace || self.mode == Mode::Play)
             .tooltip_text("Place agent"),
             &mut ui,
         ) {
@@ -292,10 +334,55 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
+            .current(
+                self.mode == Mode::Select
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Select"),
             &mut ui,
         ) {
             self.set_mode(Mode::Select);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Pan])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .current(self.left_mouse_action == LeftMouseAction::Pan)
+            .tooltip_text("Pan (Middle mouse + drag)"),
+            &mut ui,
+        ) {
+            self.set_mode(Mode::Pan);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Zoom])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .current(self.left_mouse_action == LeftMouseAction::Zoom)
+            .tooltip_text("Zoom (Middle mouse wheel)"),
+            &mut ui,
+        ) {
+            self.set_mode(Mode::Zoom);
         }
 
         for _ in items.next(&ui).unwrap().set(
@@ -311,7 +398,8 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .tooltip_text("Undo"),
+            .enabled(!self.undo_stack_mut().is_undo_empty())
+            .tooltip_text("Undo (Ctrl + Z)"),
             &mut ui,
         ) {
             self.undo();
@@ -330,10 +418,201 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .tooltip_text("Redo"),
+            .enabled(!self.undo_stack_mut().is_redo_empty())
+            .tooltip_text("Redo (Ctrl + Y)"),
             &mut ui,
         ) {
             self.redo();
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Cut])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Cut (Ctrl + X)"),
+            &mut ui,
+        ) {
+            self.cut(true);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Copy])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Copy (Ctrl + C)"),
+            &mut ui,
+        ) {
+            self.copy(true);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Paste])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Paste (Ctrl + V)"),
+            &mut ui,
+        ) {
+            self.paste();
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Save])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Save (Ctrl + S)"),
+            &mut ui,
+        ) {
+            crate::save_grid_in_url(&self.grid);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Rotate])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Rotate Counterclockwise (R)"),
+            &mut ui,
+        ) {
+            self.rotate_active(1);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Rotate])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    -2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Rotate Clockwise (T)"),
+            &mut ui,
+        ) {
+            self.rotate_active(-1)
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::FlipX])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Flip X (X)"),
+            &mut ui,
+        ) {
+            self.flip_x_active()
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::FlipY])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Flip Y (Y)"),
+            &mut ui,
+        ) {
+            self.flip_y_active()
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::Twist])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Twist (U)"),
+            &mut ui,
+        ) {
+            self.twist_active()
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[TrianglesType::CycleState])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .tooltip_text("Cycle State (C)"),
+            &mut ui,
+        ) {
+            self.cycle_state_active();
         }
 
         // Gadget selector

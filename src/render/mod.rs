@@ -14,7 +14,7 @@ pub use texture::{TextureType, TEXTURES};
 pub use ui::UiRenderer;
 
 use crate::gadget::Gadget;
-use crate::grid::{Grid, WH, XY, GridItem};
+use crate::grid::{Grid, GridItem, WH, XY};
 
 use crate::log;
 use crate::shape::{Rectangle, Shape};
@@ -32,8 +32,14 @@ use std::rc::Rc;
 /// Also assumes that the camera is looking directly at the grid, with no rotation.
 /// A z-index and offset is provided.
 /// The background is optionally rendered.
-pub fn render_grid<T: GridItem, R>(grid: &Grid<T>, camera: &Camera, r: &mut R, xy: XY, z: f64, render_background: bool)
-where
+pub fn render_grid<T: GridItem, R>(
+    grid: &Grid<T>,
+    camera: &Camera,
+    r: &mut R,
+    xy: XY,
+    z: f64,
+    render_background: bool,
+) where
     R: GridItemRenderer<Item = T>,
 {
     let center = camera.position();
@@ -61,6 +67,10 @@ where
 
     let offset = xy.cast::<f64>().unwrap().extend(0.0);
     let mut camera = camera.clone();
-    camera.set_view(camera.position() - offset, camera.target() - offset, *camera.up());
+    camera.set_view(
+        camera.position() - offset,
+        camera.target() - offset,
+        *camera.up(),
+    );
     r.end(&camera);
 }
