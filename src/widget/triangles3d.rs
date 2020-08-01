@@ -41,12 +41,9 @@ impl Triangles3d {
         let width = gadget.size().0 as f64;
         let height = gadget.size().1 as f64;
 
-        let mut triangles = gadget.renderer().triangles().clone();
-        triangles.append(gadget.renderer().port_triangles().clone());
-
         Self {
             common: widget::CommonBuilder::default(),
-            triangles: triangles.with_default_extra(),
+            triangles: gadget.renderer().triangles().clone().with_default_extra(),
             src_center: vec2(width / 2.0, height / 2.0),
             src_width: width,
             src_height: height,

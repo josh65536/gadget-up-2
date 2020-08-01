@@ -7,8 +7,8 @@ use conrod_core::input::{ModifierKey, Motion};
 use conrod_core::widget::bordered_rectangle;
 use conrod_core::widget::{self, BorderedRectangle, Widget};
 use conrod_core::widget_ids;
-use conrod_core::{color, Point, Rect};
 use conrod_core::Positionable;
+use conrod_core::{color, Point, Rect};
 use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use crate::bitfield;

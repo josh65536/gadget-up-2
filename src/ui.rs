@@ -2,7 +2,7 @@ use cgmath::vec2;
 use conrod_core::color;
 
 use conrod_core::render::PrimitiveWalker;
-use conrod_core::widget::text::{Text};
+use conrod_core::widget::text::Text;
 use conrod_core::widget::Canvas;
 use conrod_core::widget::{bordered_rectangle, BorderedRectangle, List};
 use conrod_core::widget_ids;
@@ -12,14 +12,12 @@ use ref_thread_local::RefThreadLocal;
 
 use crate::gadget::Agent;
 
-
 use crate::render::TrianglesType;
-use crate::render::{TRIANGLESES};
+use crate::render::TRIANGLESES;
 use crate::widget::button;
 use crate::widget::screen::SelectFunc;
 use crate::widget::{screen, Button, ContraptionScreen, SelectionGrid, Triangles3d};
 use crate::App;
-
 
 widget_ids! {
     pub struct WidgetIds {
@@ -306,7 +304,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Agent])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Agent])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -327,7 +325,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Select])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Select])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -351,7 +349,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Pan])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Pan])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -371,7 +369,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Zoom])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Zoom])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -391,7 +389,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Undo])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Undo])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -411,7 +409,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Undo])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Undo])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -431,7 +429,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Cut])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Cut])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -451,7 +449,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Copy])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Copy])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -471,7 +469,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Paste])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Paste])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -491,7 +489,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Save])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Save])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -510,7 +508,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Rotate])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Rotate])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -520,8 +518,12 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || self.mode == Mode::AgentPlace ||
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::AgentPlace
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Rotate Counterclockwise (R)"),
             &mut ui,
         ) {
@@ -531,7 +533,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Rotate])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Rotate])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -541,8 +543,12 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || self.mode == Mode::AgentPlace ||
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::AgentPlace
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Rotate Clockwise (T)"),
             &mut ui,
         ) {
@@ -552,7 +558,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::FlipX])
+                    (*TRIANGLESES.borrow()[&TrianglesType::FlipX])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -562,8 +568,11 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || 
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Flip X (X)"),
             &mut ui,
         ) {
@@ -573,7 +582,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::FlipY])
+                    (*TRIANGLESES.borrow()[&TrianglesType::FlipY])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -583,8 +592,11 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || 
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Flip Y (Y)"),
             &mut ui,
         ) {
@@ -594,7 +606,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::Twist])
+                    (*TRIANGLESES.borrow()[&TrianglesType::Twist])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -604,8 +616,11 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || 
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Twist (U)"),
             &mut ui,
         ) {
@@ -615,7 +630,7 @@ impl<'a> App<'a> {
         for _ in items.next(&ui).unwrap().set(
             as_menu_button(
                 Button::triangles(Triangles3d::new(
-                    (*TRIANGLESES.borrow()[TrianglesType::CycleState])
+                    (*TRIANGLESES.borrow()[&TrianglesType::CycleState])
                         .clone()
                         .with_default_extra(),
                     vec2(0.0, 0.0),
@@ -625,8 +640,11 @@ impl<'a> App<'a> {
                 self,
                 &mut ui,
             )
-            .enabled(self.mode == Mode::TilePaint || 
-                self.mode == Mode::GadgetMove || self.mode == Mode::GadgetPaste)
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
             .tooltip_text("Cycle State (C)"),
             &mut ui,
         ) {

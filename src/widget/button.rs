@@ -1,16 +1,15 @@
 use conrod_core::builder_methods;
 use conrod_core::position::{self, Align, Place};
+use conrod_core::text;
 use conrod_core::widget::bordered_rectangle;
 use conrod_core::widget::{self, BorderedRectangle, Common, CommonBuilder, Text};
 use conrod_core::widget_ids;
-use conrod_core::{text};
+use conrod_core::Colorable;
 use conrod_core::{Color, FontSize, Positionable, Scalar, Sizeable, Widget};
-use conrod_core::{Colorable};
 use conrod_derive::WidgetStyle;
 use std::ops::{Deref, DerefMut};
 
 use super::triangles3d::Triangles3d;
-
 
 pub struct Button<'a, S> {
     inner: widget::Button<'a, S>,
@@ -227,6 +226,6 @@ impl<'a> Widget for Button<'a, Triangles> {
         let (_interaction, times_triggered) =
             widget::button::interaction_and_times_triggered(id, ui);
 
-        widget::button::TimesClicked(if self.enabled {times_triggered} else {0})
+        widget::button::TimesClicked(if self.enabled { times_triggered } else { 0 })
     }
 }

@@ -1,7 +1,9 @@
 use std::rc::Rc;
+use ref_thread_local::RefThreadLocal;
 
 use crate::gadget::{Gadget, GadgetDef, State};
-use crate::spsp_multi;
+use crate::render::lang::{GRLS, Grl};
+use crate::{spsp_multi, grl};
 
 pub fn preset_gadgets() -> Vec<Gadget> {
     let def = Rc::new(GadgetDef::new(1, 0));
@@ -77,6 +79,9 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let diode = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Diode");
 
+    // Now for more interesting stuff
+    let mut renderers = vec![];
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         2,
@@ -84,6 +89,13 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     ));
 
     let toggle = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Toggle");
+
+    let sqrt_half: f64 = 0.5f64.sqrt();
+
+    renderers.push((Rc::clone(&def), grl!(
+        { (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15) }
+        { (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15) }
+    ), false));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -93,6 +105,20 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let dicrumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Directed crumbler");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0.0 => 1.0, Grl::Z), dotted, |>, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         2,
@@ -101,6 +127,20 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let crumbler = Gadget::new(&def, (1, 1), vec![0, 2], State(0)).name_this("Crumbler");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0.0 => 1.0, Grl::Z), dotted, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         3,
@@ -108,6 +148,20 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     ));
 
     let scd = Gadget::new(&def, (1, 1), vec![0, 3, 1], State(0)).name_this("Self-closing door");
+
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (port_path 1 => 2, 0.0 => 1.0, Grl::Z), dotted, |>, fade),
+            (path (line ((1 => 2, 0.5; 1.0, size, size) + (z Grl::Z)) => ((1 => 2, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((1 => 2, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((1 => 2, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+        }
+        {
+            (path (line ((1 => 2, 0.5; 1.0, size, size) + (z Grl::Z)) => ((1 => 2, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((1 => 2, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((1 => 2, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+    )}, false));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -121,6 +175,17 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     ));
 
     let toggle2 = Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("2-toggle");
+
+    renderers.push((Rc::clone(&def), grl!(
+        { 
+            (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15),
+            (rect ((2 => 3, 0.5) + (z Grl::Z)), ((2 => 3, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15),
+        }
+        { 
+            (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15),
+            (rect ((2 => 3, 0.5) + (z Grl::Z)), ((2 => 3, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 0.15, 0.15),
+        }
+    ), false));
 
     def = Rc::new(GadgetDef::from_traversals(
         3,
@@ -145,6 +210,25 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     let mismatched_dicrumbler =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Mismatched dicrumblers");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, |>, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), dotted, |>, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
@@ -159,6 +243,25 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     let mismatched_crumbler =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Mismatched crumblers");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), dotted, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
@@ -167,6 +270,25 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let matched_dicrumbler =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Matched dicrumblers");
+
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), dotted, |>, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, |>, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+        }
+    )}, false));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -182,6 +304,25 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     let matched_crumbler =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Matched crumblers");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        {
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid),
+        }
+        {
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), dotted, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((0 => 1, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, fade),
+            (path (line ((2 => 3, 0.5; 1.0, size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, -size, -size) + (z Grl::Z))), solid, fade),
+            (path (line ((2 => 3, 0.5; 1.0, -size, size) + (z Grl::Z)) => ((2 => 3, 0.5; 1.0, size, -size) + (z Grl::Z))), solid, fade),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
@@ -195,6 +336,22 @@ pub fn preset_gadgets() -> Vec<Gadget> {
 
     let toggle_lock =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Toggle lock");
+
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        { 
+            (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0001)), size, (0.75, 0.85, 1.0, 1.0)),
+            (path (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0002)), size), solid),
+            (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 2.0 * size, 2.0 * size),
+        }
+        { 
+            (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0001)), size, (0.75, 0.85, 1.0, 1.0)),
+            (path (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0002)), size), solid, fade),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, fade),
+            (rect ((0 => 1, 0.5) + (z Grl::Z)), ((0 => 1, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 2.0 * size, 2.0 * size),
+        }
+    )}, false));
 
     def = Rc::new(GadgetDef::from_traversals(
         2,
@@ -212,6 +369,22 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     let tripwire_lock =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Tripwire lock");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        { 
+            (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0001)), size, (0.75, 0.85, 1.0, 1.0)),
+            (path (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0002)), size), solid),
+            (path (line ((0 => 1, 0.5; 1.0, size, 0.0) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, 0.0) + (z Grl::Z))), solid),
+        }
+        { 
+            (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0001)), size, (0.75, 0.85, 1.0, 1.0)),
+            (path (circle ((2 => 3, 0.5) + (z Grl::Z - 0.0002)), size), solid, fade),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), dotted, fade),
+            (path (line ((0 => 1, 0.5; 1.0, size, 0.0) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, 0.0) + (z Grl::Z))), solid),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         4,
@@ -228,6 +401,19 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     let tripwire_toggle =
         Gadget::new(&def, (1, 1), vec![0, 1, 2, 3], State(0)).name_this("Tripwire toggle");
 
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        { 
+            (path (line ((0 => 1, 0.5; 1.0, size, 0.0) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, 0.0) + (z Grl::Z))), solid),
+            (rect ((2 => 3, 0.5) + (z Grl::Z)), ((2 => 3, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 2.0 * size, 2.0 * size),
+        }
+        { 
+            (path (line ((0 => 1, 0.5; 1.0, size, 0.0) + (z Grl::Z)) => ((0 => 1, 0.5; 1.0, -size, 0.0) + (z Grl::Z))), solid),
+            (rect ((2 => 3, 0.5) + (z Grl::Z)), ((2 => 3, 0.5; dir sqrt_half, sqrt_half) + (z Grl::Z)), 2.0 * size, 2.0 * size),
+        }
+    )}, false));
+
     def = Rc::new(GadgetDef::from_traversals(
         2,
         6,
@@ -241,6 +427,23 @@ pub fn preset_gadgets() -> Vec<Gadget> {
     ));
 
     let door = Gadget::new(&def, (2, 1), vec![4, 5, 1, 2, 0, 3], State(0)).name_this("Door");
+
+    renderers.push((Rc::clone(&def), {
+        let size = 0.15 / 2.0;
+        grl!(
+        { 
+            (path (port_path 4 => 5, 0. => 1., Grl::Z), dotted, |>, fade),
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), solid, |>, (0.0, 0.5, 0.0, 1.0)),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), solid, |>, (1.0, 0.0, 0.0, 1.0)),
+        }
+        { 
+            (path (port_path 4 => 5, 0. => 1., Grl::Z), solid, |>),
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), solid, |>, (0.0, 0.7, 0.0, 1.0)),
+            (path (port_path 2 => 3, 0. => 1., Grl::Z), solid, |>, (1.0, 0.0, 0.0, 1.0)),
+        }
+    )}, true));
+
+    GRLS.borrow_mut().init(renderers);
 
     vec![
         nope,

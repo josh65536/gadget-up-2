@@ -1,5 +1,5 @@
 use cgmath::BaseNum;
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
+use cgmath::{Deg, Matrix2, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 use std::ops::Neg;
 
 #[allow(dead_code)]
@@ -10,6 +10,7 @@ pub type Vec2i = Vector2<isize>;
 pub type Vec2 = Vector2<f64>;
 pub type Vec3 = Vector3<f64>;
 pub type Vec4 = Vector4<f64>;
+pub type Mat2 = Matrix2<f64>;
 pub type Mat4 = Matrix4<f64>;
 pub type Pt3 = Point3<f64>;
 pub type Degrees = Deg<f64>;

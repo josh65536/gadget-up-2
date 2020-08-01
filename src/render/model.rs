@@ -1,14 +1,13 @@
 use cgmath::{vec3, vec4, Vector3, Vector4};
 use fnv::FnvHashMap;
 
-use golem::{UniformValue};
+use golem::UniformValue;
 use golem::{Context, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 use ref_thread_local::{ref_thread_local, RefThreadLocal};
 use std::rc::Rc;
 
-use super::{Camera, ShaderType, SHADERS, GadgetRenderInfo};
-use crate::shape::{Circle, Shape};
+use super::{Camera, ShaderType, SHADERS};
 use crate::math::{Mat4, Vec3};
 use crate::static_map::StaticMap;
 
@@ -301,7 +300,6 @@ impl<'a> Drop for InstancedRenderingModel<'a> {
 pub enum TrianglesType {
     Agent,
     GadgetRectangle,
-    PortCircle,
     SelectionMark,
     Undo,
     Select,
@@ -347,11 +345,6 @@ fn triangles_map(_: ()) -> TrianglesMap {
                 ],
                 vec![0, 1, 2, 2, 3, 0],
             )),
-        ),
-        (
-            TrianglesType::PortCircle,
-            Rc::new(Circle::new(0.0, 0.0, GadgetRenderInfo::PORT_Z, GadgetRenderInfo::PORT_RADIUS)
-                .triangles(GadgetRenderInfo::PORT_COLOR)),
         ),
         (
             TrianglesType::SelectionMark,
@@ -427,7 +420,6 @@ pub enum ModelType {
     Agent,
     GadgetRectangleInstanced,
     SelectionMarkInstanced,
-    PortCircleInstanced,
     Undo,
     Select,
     Pan,
@@ -457,136 +449,128 @@ fn model_map(gl: &Context) -> ModelMap {
             ModelType::Agent,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Agent],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Agent],
             )),
         ),
         (
             ModelType::GadgetRectangleInstanced,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Offset],
-                &TRIANGLESES.borrow()[TrianglesType::GadgetRectangle],
+                &SHADERS.borrow()[&ShaderType::Offset],
+                &TRIANGLESES.borrow()[&TrianglesType::GadgetRectangle],
             )),
         ),
         (
             ModelType::SelectionMarkInstanced,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::SelectionMark],
-            )),
-        ),
-        (
-            ModelType::PortCircleInstanced,
-            Rc::new(Model::new(
-                gl,
-                &SHADERS.borrow()[ShaderType::Offset],
-                &TRIANGLESES.borrow()[TrianglesType::PortCircle],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::SelectionMark],
             )),
         ),
         (
             ModelType::Undo,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Undo],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Undo],
             )),
         ),
         (
             ModelType::Select,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Select],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Select],
             )),
         ),
         (
             ModelType::Pan,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Pan],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Pan],
             )),
         ),
         (
             ModelType::Zoom,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Zoom],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Zoom],
             )),
         ),
         (
             ModelType::Cut,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Cut],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Cut],
             )),
         ),
         (
             ModelType::Copy,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::Basic],
-                &TRIANGLESES.borrow()[TrianglesType::Copy],
+                &SHADERS.borrow()[&ShaderType::Basic],
+                &TRIANGLESES.borrow()[&TrianglesType::Copy],
             )),
         ),
         (
             ModelType::Paste,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::Paste],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::Paste],
             )),
         ),
         (
             ModelType::Save,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::Save],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::Save],
             )),
         ),
         (
             ModelType::Rotate,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::Rotate],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::Rotate],
             )),
         ),
         (
             ModelType::FlipX,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::FlipX],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::FlipX],
             )),
         ),
         (
             ModelType::FlipY,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::FlipY],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::FlipY],
             )),
         ),
         (
             ModelType::Twist,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::Twist],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::Twist],
             )),
         ),
         (
             ModelType::CycleState,
             Rc::new(Model::new(
                 gl,
-                &SHADERS.borrow()[ShaderType::ScaleOffset],
-                &TRIANGLESES.borrow()[TrianglesType::CycleState],
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::CycleState],
             )),
         ),
     ]

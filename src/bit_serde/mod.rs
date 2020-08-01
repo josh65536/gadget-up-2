@@ -12,7 +12,7 @@ mod ser;
 
 use bitvec::prelude::*;
 use serde::de::DeserializeOwned;
-use serde::{Serialize};
+use serde::Serialize;
 
 pub use de::{from_bits, Deserializer};
 pub use error::{Error, Result};
@@ -81,8 +81,8 @@ pub fn from_base64<T: DeserializeOwned>(s: &str, padding: usize) -> Result<T> {
 mod test {
     use super::*;
     use serde::de::DeserializeOwned;
-    use std::fmt::Debug;
     use serde::Deserialize;
+    use std::fmt::Debug;
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     enum Enum {

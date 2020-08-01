@@ -5,7 +5,7 @@ use conrod_core::text::GlyphCache;
 use conrod_core::utils;
 use conrod_core::{Ui, Widget};
 
-use golem::{UniformValue};
+use golem::UniformValue;
 use golem::{ColorFormat, Context, ShaderProgram};
 use golem::{ElementBuffer, GeometryMode, VertexBuffer};
 
@@ -52,7 +52,7 @@ impl<'a> UiRenderer<'a> {
                 .dimensions(GLYPH_CACHE_WIDTH as u32, GLYPH_CACHE_HEIGHT as u32)
                 .build(),
             camera,
-            program: Rc::clone(&SHADERS.borrow()[ShaderType::TexScaleOffset]),
+            program: Rc::clone(&SHADERS.borrow()[&ShaderType::TexScaleOffset]),
             triangles: TrianglesEx::default(),
             vertex_buffer: VertexBuffer::new(gl).unwrap(),
             index_buffer: ElementBuffer::new(gl).unwrap(),
@@ -86,7 +86,7 @@ impl<'a> UiRenderer<'a> {
         self.program
             .set_uniform("image", UniformValue::Int(1))
             .unwrap();
-        TEXTURES.borrow()[TextureType::Main].set_active(std::num::NonZeroU32::new(1).unwrap());
+        TEXTURES.borrow()[&TextureType::Main].set_active(std::num::NonZeroU32::new(1).unwrap());
 
         self.vertex_buffer
             .set_data(&self.triangles.iter_vertex_items().collect::<Vec<_>>());
@@ -105,7 +105,9 @@ impl<'a> UiRenderer<'a> {
     }
 
     pub fn primitive(&mut self, p: Primitive, _ui: &Ui) {
-        let Primitive { id: _, kind, rect, .. } = p;
+        let Primitive {
+            id: _, kind, rect, ..
+        } = p;
 
         let (x, y, w, h) = rect.x_y_w_h();
 
@@ -231,7 +233,7 @@ impl<'a> UiRenderer<'a> {
                             .flat_map(|c| vec![*c; 4].into_iter())
                             .collect::<Vec<_>>();
 
-                        TEXTURES.borrow_mut()[TextureType::Main].set_subimage(
+                        TEXTURES.borrow_mut()[&TextureType::Main].set_subimage(
                             &data,
                             rect.min.x + GLYPH_CACHE_OFFSET_X as u32,
                             rect.min.y + GLYPH_CACHE_OFFSET_Y as u32,

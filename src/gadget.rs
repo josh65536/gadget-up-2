@@ -1,4 +1,4 @@
-use cgmath::{vec2};
+use cgmath::vec2;
 use fnv::{FnvHashMap, FnvHashSet};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -7,11 +7,10 @@ use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
 
 use crate::grid::{Grid, GridItem, WH, XY};
-
+use crate::bit_serde;
 use crate::math::{Vec2, Vec2i, Vector2Ex};
 
-use crate::render::{GadgetRenderInfo};
-
+use crate::render::GadgetRenderInfo;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -143,6 +142,14 @@ impl GadgetDef {
             .filter(|((s, _), _)| *s == state)
             .map(|((_, p0), (_, p1))| (*p0, *p1))
             .collect()
+    }
+
+    pub fn hash_string(&self) -> String {
+        let mut traversals = self.traversals().collect::<Vec<_>>();
+        traversals.sort();
+
+        let base64 = bit_serde::to_base64(&(self.num_states, self.num_ports, traversals)).unwrap();
+        format!("{}{}", base64.0, base64.1)
     }
 }
 

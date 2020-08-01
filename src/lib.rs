@@ -39,8 +39,8 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 use winit::dpi::LogicalSize;
+use winit::event::ModifiersState;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event::{ModifiersState};
 use winit::event_loop::{ControlFlow, EventLoop};
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
@@ -49,9 +49,9 @@ use winit::window::WindowBuilder;
 use gadget::{Agent, Gadget, GadgetDef, State};
 use grid::Grid;
 use math::Vec2;
+use render::TEXTURES;
 use render::{Camera, GadgetRenderer, SelectionRenderer, UiRenderer};
 use render::{MODELS, SHADERS, TRIANGLESES};
-use render::{TEXTURES};
 use ui::{LeftMouseAction, Mode, WidgetIds};
 
 #[macro_export]
@@ -1048,4 +1048,9 @@ pub fn main_js() -> Result<(), JsValue> {
 
 fn window() -> web_sys::Window {
     web_sys::window().expect("No window!")
+}
+
+#[allow(dead_code)]
+fn fake_panic() {
+    panic!("This is fake")
 }

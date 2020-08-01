@@ -9,7 +9,14 @@ use crate::render::{Triangles, Vertex};
 pub trait Shape {
     fn num_vertices(&self) -> usize;
 
-    fn positions(&self) -> Vec<Vector3<f32>>;
+    fn positions_f64(&self) -> Vec<Vector3<f64>>;
+
+    fn positions(&self) -> Vec<Vector3<f32>> {
+        self.positions_f64()
+            .into_iter()
+            .map(|v| v.cast::<f32>().unwrap())
+            .collect()
+    }
 
     fn indexes(&self) -> Vec<u32>;
 
@@ -23,6 +30,21 @@ pub trait Shape {
                 .collect(),
             self.indexes(),
         )
+    }
+}
+
+// For convenience of providing a color
+impl Shape for (Vec<Vector3<f64>>, Vec<u32>) {
+    fn num_vertices(&self) -> usize {
+        self.0.len()
+    }
+
+    fn positions_f64(&self) -> Vec<Vector3<f64>> {
+        self.0.clone()
+    }
+
+    fn indexes(&self) -> Vec<u32> {
+        self.1.clone()
     }
 }
 
@@ -53,12 +75,12 @@ impl Shape for Rectangle {
     }
 
     #[rustfmt::skip]
-    fn positions(&self) -> Vec<Vector3<f32>> {
+    fn positions_f64(&self) -> Vec<Vector3<f64>> {
         vec![
-            vec3(self.min_x as f32, self.min_y as f32, self.z as f32),
-            vec3(self.max_x as f32, self.min_y as f32, self.z as f32),
-            vec3(self.max_x as f32, self.max_y as f32, self.z as f32),
-            vec3(self.min_x as f32, self.max_y as f32, self.z as f32),
+            vec3(self.min_x, self.min_y, self.z),
+            vec3(self.max_x, self.min_y, self.z),
+            vec3(self.max_x, self.max_y, self.z),
+            vec3(self.min_x, self.max_y, self.z),
         ]
     }
 
@@ -89,34 +111,21 @@ impl Shape for Circle {
         Self::RESOLUTION + 1
     }
 
-    fn positions(&self) -> Vec<Vector3<f32>> {
+    fn positions_f64(&self) -> Vec<Vector3<f64>> {
         (0..Self::RESOLUTION)
             .map(|i| {
                 vec3(
-                    ((TAU_F64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x)
-                        as f32,
-                    ((TAU_F64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y)
-                        as f32,
-                    self.z as f32,
+                    (TAU_F64 * i as f64 / Self::RESOLUTION as f64).cos() * self.radius + self.x,
+                    (TAU_F64 * i as f64 / Self::RESOLUTION as f64).sin() * self.radius + self.y,
+                    self.z,
                 )
             })
-            .chain(std::iter::once(vec3(
-                self.x as f32,
-                self.y as f32,
-                self.z as f32,
-            )))
             .collect()
     }
 
     fn indexes(&self) -> Vec<u32> {
-        (0..Self::RESOLUTION)
-            .flat_map(|i| {
-                vec![
-                    Self::RESOLUTION as u32,
-                    i as u32,
-                    (if i + 1 == Self::RESOLUTION { 0 } else { i + 1 }) as u32,
-                ]
-            })
+        (1..(Self::RESOLUTION - 1))
+            .flat_map(|i| vec![0, i as u32, i as u32 + 1])
             .collect()
     }
 }
@@ -139,6 +148,10 @@ impl Path {
             thickness,
             closed,
         }
+    }
+
+    pub fn z(&self) -> f64 {
+        self.z
     }
 
     /// Splits a cubic bezier curve into line segments
@@ -168,12 +181,101 @@ impl Path {
         }
     }
 
+    pub fn start_position(&self) -> Vec2 {
+        self.xys[0]
+    }
+
+    pub fn end_position(&self) -> Vec2 {
+        *self.xys.last().unwrap()
+    }
+
     pub fn start_direction(&self) -> Vec2 {
         (self.xys[1] - self.xys[0]).normalize()
     }
 
     pub fn end_direction(&self) -> Vec2 {
         (self.xys[self.xys.len() - 1] - self.xys[self.xys.len() - 2]).normalize()
+    }
+
+    pub fn iter(&self) -> PathIter {
+        if self.closed {
+            unimplemented!("Path iter not supported for closed paths yet");
+        }
+
+        PathIter::new(self)
+    }
+
+    pub fn len(&self) -> f64 {
+        let mut len = self
+            .xys
+            .iter()
+            .zip(self.xys.iter().skip(1))
+            .map(|(p0, p1)| p0.distance(*p1))
+            .sum();
+
+        if self.closed {
+            len += self.xys.last().unwrap().distance(self.xys[0]);
+        }
+
+        len
+    }
+}
+
+pub struct PathIter<'a> {
+    path: &'a Path,
+    point: usize,
+    t: f64, // ranges from 0 to segment_len
+    segment_len: f64,
+}
+
+impl<'a> PathIter<'a> {
+    pub fn new(path: &'a Path) -> Self {
+        let mut iter = PathIter {
+            path,
+            point: 0,
+            t: 0.0,
+            segment_len: 0.0,
+        };
+
+        iter.update_segment_len();
+        iter
+    }
+
+    pub fn update_segment_len(&mut self) {
+        self.segment_len = self.path.xys[self.point].distance(self.path.xys[self.point + 1]);
+    }
+
+    pub fn finished(&self) -> bool {
+        self.point == self.path.xys.len() - 2 && self.t >= self.segment_len
+    }
+
+    pub fn curr_point(&self) -> Vec2 {
+        let t = self.t / self.segment_len;
+        self.path.xys[self.point] * (1.0 - t) + self.path.xys[self.point + 1] * t
+    }
+
+    pub fn subpath(&mut self, mut length: f64) -> Path {
+        let mut xys = vec![self.curr_point()];
+
+        self.t += length;
+
+        while self.t >= self.segment_len && !self.finished() {
+            self.t -= self.segment_len;
+            self.point += 1;
+            self.update_segment_len();
+            xys.push(self.path.xys[self.point]);
+        }
+
+        self.t = self.t.min(self.segment_len);
+
+        xys.push(self.curr_point());
+
+        Path::new(xys, self.path.z, self.path.thickness, false)
+    }
+
+    /// Like subpath, but intentionally drops the path
+    pub fn advance(&mut self, length: f64) {
+        self.subpath(length);
     }
 }
 
@@ -182,7 +284,7 @@ impl Shape for Path {
         self.xys.len() * 2
     }
 
-    fn positions(&self) -> Vec<Vector3<f32>> {
+    fn positions_f64(&self) -> Vec<Vector3<f64>> {
         let mut vec = Vec::new();
         vec.reserve(self.num_vertices());
 
@@ -203,8 +305,8 @@ impl Shape for Path {
                 let dv1 = dv1.right_ccw().normalize_to(self.thickness / 2.0);
 
                 vec.extend(&[
-                    vec3((v1.x + dv1.x) as f32, (v1.y + dv1.y) as f32, self.z as f32),
-                    vec3((v1.x - dv1.x) as f32, (v1.y - dv1.y) as f32, self.z as f32),
+                    vec3(v1.x + dv1.x, v1.y + dv1.y, self.z),
+                    vec3(v1.x - dv1.x, v1.y - dv1.y, self.z),
                 ]);
             }
         }
@@ -215,8 +317,8 @@ impl Shape for Path {
                 let dv0 = dv0.right_ccw().normalize_to(self.thickness / 2.0);
 
                 vec.extend(&[
-                    vec3((v1.x + dv0.x) as f32, (v1.y + dv0.y) as f32, self.z as f32),
-                    vec3((v1.x - dv0.x) as f32, (v1.y - dv0.y) as f32, self.z as f32),
+                    vec3(v1.x + dv0.x, v1.y + dv0.y, self.z),
+                    vec3(v1.x - dv0.x, v1.y - dv0.y, self.z),
                 ]);
             } else {
                 let dv0: Vec2 = (v1 - v0).normalize();
@@ -224,8 +326,8 @@ impl Shape for Path {
 
                 let dv = (dv1.right_ccw() + dv0.right_ccw()).normalize_to(self.thickness / 2.0);
                 vec.extend(&[
-                    vec3((v1.x + dv.x) as f32, (v1.y + dv.y) as f32, self.z as f32),
-                    vec3((v1.x - dv.x) as f32, (v1.y - dv.y) as f32, self.z as f32),
+                    vec3(v1.x + dv.x, v1.y + dv.y, self.z),
+                    vec3(v1.x - dv.x, v1.y - dv.y, self.z),
                 ]);
             }
         }

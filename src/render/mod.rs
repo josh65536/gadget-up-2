@@ -1,5 +1,6 @@
 mod camera;
 mod gadget;
+pub mod lang;
 mod model;
 mod shader;
 mod texture;
@@ -13,18 +14,7 @@ pub use shader::{ShaderType, SHADERS};
 pub use texture::{TextureType, TEXTURES};
 pub use ui::UiRenderer;
 
-
 use crate::grid::{Grid, GridItem, XY};
-
-
-
-
-
-
-
-
-
-
 
 /// Takes a grid and renders it. Assumes the grid is on the XY plane,
 /// with X in the grid pointing in the X direction
@@ -53,7 +43,14 @@ pub fn render_grid<T: GridItem, R>(
     let min_y = (center.y - xy.y as f64) - height / 2.0;
     let max_y = (center.y - xy.y as f64) + height / 2.0;
 
-    r.begin();
+    let offset = xy.cast::<f64>().unwrap().extend(0.0);
+    let mut camera = camera.clone();
+    camera.set_view(
+        camera.position() - offset,
+        camera.target() - offset,
+        *camera.up(),
+    );
+    r.begin(&camera);
 
     if render_background {
         for xy in grid.get_empty_in_bounds(min_x, max_x, min_y, max_y) {
@@ -65,12 +62,5 @@ pub fn render_grid<T: GridItem, R>(
         r.render(Some(t), *xy, *wh, z);
     }
 
-    let offset = xy.cast::<f64>().unwrap().extend(0.0);
-    let mut camera = camera.clone();
-    camera.set_view(
-        camera.position() - offset,
-        camera.target() - offset,
-        *camera.up(),
-    );
-    r.end(&camera);
+    r.end();
 }

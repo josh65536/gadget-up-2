@@ -8,7 +8,7 @@ use std::ops::Index;
 /// This is intended to be used for small keys for now
 pub struct StaticMap<K, V, F, A>
 where
-    K: Hash + Copy + Eq,
+    K: Hash + Eq,
     F: FnOnce(A) -> FnvHashMap<K, V>,
 {
     map: FnvHashMap<K, V>,
@@ -18,7 +18,7 @@ where
 
 impl<K, V, F, A> StaticMap<K, V, F, A>
 where
-    K: Hash + Copy + Eq,
+    K: Hash + Eq,
     F: FnOnce(A) -> FnvHashMap<K, V>,
 {
     /// Creates a new static map with an init function
@@ -29,13 +29,21 @@ where
             _marker: PhantomData,
         }
     }
+
+    pub fn get(&self, index: &K) -> Option<&V> {
+        assert!(
+            self.init.is_none(),
+            "Initialize the static map before using it"
+        );
+        self.map.get(index)
+    }
 }
 
 // higher-kinded types when
 
 impl<K, V, F> StaticMap<K, V, F, ()>
 where
-    K: Hash + Copy + Eq,
+    K: Hash + Eq,
     F: FnOnce(()) -> FnvHashMap<K, V>,
 {
     /// Initializes the static map with args.
@@ -48,9 +56,24 @@ where
     }
 }
 
+impl<K, V, F, E> StaticMap<K, V, F, Vec<E>>
+where
+    K: Hash + Eq,
+    F: FnOnce(Vec<E>) -> FnvHashMap<K, V>,
+{
+    /// Initializes the static map with args.
+    /// Call this before using the map.
+    pub fn init(&mut self, args: Vec<E>) {
+        self.map = self
+            .init
+            .take()
+            .expect("Attempted to initialize a static map more than once")(args);
+    }
+}
+
 impl<'a, K, V, F, RefA> StaticMap<K, V, F, &'a RefA>
 where
-    K: Hash + Copy + Eq,
+    K: Hash + Eq,
     for<'b> F: FnOnce(&'b RefA) -> FnvHashMap<K, V>,
 {
     /// Initializes the static map with args.
@@ -63,18 +86,18 @@ where
     }
 }
 
-impl<K, V, F, A> Index<K> for StaticMap<K, V, F, A>
+impl<K, V, F, A> Index<&K> for StaticMap<K, V, F, A>
 where
-    K: Hash + Copy + Eq,
+    K: Hash + Eq,
     F: FnOnce(A) -> FnvHashMap<K, V>,
 {
     type Output = V;
 
-    fn index(&self, index: K) -> &Self::Output {
+    fn index(&self, index: &K) -> &Self::Output {
         assert!(
             self.init.is_none(),
             "Initialize the static map before using it"
         );
-        &self.map[&index]
+        &self.map[index]
     }
 }
