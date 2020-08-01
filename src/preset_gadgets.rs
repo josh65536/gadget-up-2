@@ -438,7 +438,7 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         }
         { 
             (path (port_path 4 => 5, 0. => 1., Grl::Z), solid, |>),
-            (path (port_path 0 => 1, 0. => 1., Grl::Z), solid, |>, (0.0, 0.7, 0.0, 1.0)),
+            (path (port_path 0 => 1, 0. => 1., Grl::Z), solid, |>, (0.0, 0.5, 0.0, 1.0)),
             (path (port_path 2 => 3, 0. => 1., Grl::Z), solid, |>, (1.0, 0.0, 0.0, 1.0)),
         }
     )}, true));

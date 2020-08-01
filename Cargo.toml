@@ -2,7 +2,7 @@
 [package]
 name = "gadget-up-2"
 description = "Tile-based implementation of gadgets"
-version = "0.2.0"
+version = "0.4.1"
 authors = ["Joshua Ani <josh4820@gmail.com>"]
 categories = ["wasm"]
 readme = "README.md"
@@ -17,11 +17,14 @@ crate-type = ["cdylib"]
 lto = true
 panic = "abort"
 # Profiling-specific
-debug = true
+# debug = true
+# 
+# [package.metadata.wasm-pack.profile.release]
+# wasm-opt = ['-O4', '-g']
+# End profiling-specific
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O4', '-g']
-# End profiling-specific
+wasm-opt = ['-O4']
 
 [features]
 # If you uncomment this line, it will enable `wee_alloc`:

@@ -13,7 +13,7 @@ use conrod_derive::{WidgetCommon, WidgetStyle};
 
 use crate::bitfield;
 use crate::grid::XY;
-
+use crate::log;
 use crate::math::Vec2;
 use crate::render::Camera;
 use crate::ui::{LeftMouseAction, Mode};

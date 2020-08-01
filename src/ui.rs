@@ -671,7 +671,7 @@ impl<'a> App<'a> {
         }
 
         // Version number
-        Text::new("Gadget Up! 2 v0.3.0")
+        Text::new("Gadget Up! 2 v0.4.1")
             .font_size(12)
             .bottom_left_with_margin_on(self.ids.gadget_select, 3.0)
             .set(self.ids.version, &mut ui);
