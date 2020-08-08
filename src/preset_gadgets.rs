@@ -511,6 +511,14 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         false,
     ));
 
+    def = Rc::new(GadgetDef::from_traversals(
+        1,
+        4,
+        spsp_multi![((0, 0), (0, 1)), ((0, 2), (0, 3)),],
+    ));
+
+    let dicross = Gadget::new(&def, (1, 1), vec![0, 2, 3, 1], State(0)).name_this("Directed Cross");
+
     GRLS.borrow_mut().init(renderers);
 
     vec![
@@ -538,5 +546,6 @@ pub fn preset_gadgets() -> Vec<Gadget> {
         lockable_diode,
         door,
         door_chooser,
+        dicross,
     ]
 }
