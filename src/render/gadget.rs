@@ -1,6 +1,6 @@
+use super::lang::{self, Grl};
 use super::{Camera, ShaderType, TrianglesEx, TrianglesType, SHADERS, TRIANGLESES};
 use super::{Model, ModelType, Triangles, Vertex, MODELS};
-use super::lang::{self, Grl};
 use crate::gadget::{Agent, Gadget, PP};
 use crate::grid::{WH, XY};
 
@@ -162,7 +162,7 @@ impl GadgetRenderInfo {
         if !self.grl_set {
             self.grl_set = true;
             self.grl = lang::get_grl(gadget.def());
-        } 
+        }
 
         let tris = self.grl.triangles(gadget);
         self.triangles.append(tris);

@@ -576,6 +576,24 @@ impl<'a> App<'a> {
         }
     }
 
+    pub fn rotate_ports_active(&mut self, num_spaces: i32) {
+        if let Some(gadget) = &mut self.gadget_tile {
+            gadget.rotate_ports(num_spaces);
+        }
+
+        if self.mode == Mode::GadgetMove {
+            for (gadget, _, _) in self.moving.iter_mut() {
+                gadget.rotate_ports(num_spaces);
+            }
+        }
+
+        if self.mode == Mode::GadgetPaste {
+            for (gadget, _, _) in self.paste.iter_mut() {
+                gadget.rotate_ports(num_spaces);
+            }
+        }
+    }
+
     pub fn pan(&mut self, xy: Vec2) {
         self.center += xy;
     }
@@ -792,6 +810,27 @@ impl<'a> App<'a> {
 
                             VirtualKeyCode::C => {
                                 self.cycle_state_active();
+                            }
+
+                            VirtualKeyCode::O => {
+                                self.rotate_ports_active(1);
+                            }
+
+                            VirtualKeyCode::P => {
+                                self.rotate_ports_active(-1);
+                            }
+
+                            VirtualKeyCode::G => {
+                                self.set_mode(Mode::TilePaint);
+                            }
+
+                            VirtualKeyCode::H => {
+                                self.set_mode(Mode::AgentPlace);
+                                self.agent = Some(Agent::new(vec2(0.5, 0.0), vec2(0, 1)));
+                            }
+
+                            VirtualKeyCode::J => {
+                                self.set_mode(Mode::Select);
                             }
 
                             VirtualKeyCode::Delete | VirtualKeyCode::Back => {

@@ -272,7 +272,7 @@ impl<'a> App<'a> {
             .wh_of(self.ids.header)
             .set(self.ids.menu, &mut ui);
 
-        let (mut items, _) = List::flow_right(17)
+        let (mut items, _) = List::flow_right(19)
             .middle_of(self.ids.menu)
             .wh_of(self.ids.menu)
             .set(self.ids.menu_list, &mut ui);
@@ -295,7 +295,7 @@ impl<'a> App<'a> {
                 &mut ui,
             )
             .current(self.mode == Mode::TilePaint)
-            .tooltip_text("Select gadget"),
+            .tooltip_text("Select gadget (G)"),
             &mut ui,
         ) {
             self.set_mode(Mode::TilePaint);
@@ -315,7 +315,7 @@ impl<'a> App<'a> {
                 &mut ui,
             )
             .current(self.mode == Mode::AgentPlace || self.mode == Mode::Play)
-            .tooltip_text("Place agent"),
+            .tooltip_text("Place agent (H)"),
             &mut ui,
         ) {
             self.set_mode(Mode::AgentPlace);
@@ -340,7 +340,7 @@ impl<'a> App<'a> {
                     || self.mode == Mode::GadgetMove
                     || self.mode == Mode::GadgetPaste,
             )
-            .tooltip_text("Select"),
+            .tooltip_text("Select (J)"),
             &mut ui,
         ) {
             self.set_mode(Mode::Select);
@@ -651,6 +651,54 @@ impl<'a> App<'a> {
             self.cycle_state_active();
         }
 
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[&TrianglesType::RotatePortsCcw])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
+            .tooltip_text("Rotate Ports Counterclockwise (O)"),
+            &mut ui,
+        ) {
+            self.rotate_ports_active(1);
+        }
+
+        for _ in items.next(&ui).unwrap().set(
+            as_menu_button(
+                Button::triangles(Triangles3d::new(
+                    (*TRIANGLESES.borrow()[&TrianglesType::RotatePortsCw])
+                        .clone()
+                        .with_default_extra(),
+                    vec2(0.0, 0.0),
+                    2.0,
+                    2.0,
+                )),
+                self,
+                &mut ui,
+            )
+            .enabled(
+                self.mode == Mode::TilePaint
+                    || self.mode == Mode::GadgetMove
+                    || self.mode == Mode::GadgetPaste,
+            )
+            .tooltip_text("Rotate Ports Clockwise (P)"),
+            &mut ui,
+        ) {
+            self.rotate_ports_active(-1);
+        }
+
         // Gadget selector
         if self.mode != Mode::Play {
             let selection = SelectionGrid::new(4, &self.gadget_select, self.gadget_selection)
@@ -671,7 +719,7 @@ impl<'a> App<'a> {
         }
 
         // Version number
-        Text::new("Gadget Up! 2 v0.4.1")
+        Text::new("Gadget Up! 2 v0.4.2")
             .font_size(12)
             .bottom_left_with_margin_on(self.ids.gadget_select, 3.0)
             .set(self.ids.version, &mut ui);

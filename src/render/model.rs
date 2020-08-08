@@ -314,6 +314,8 @@ pub enum TrianglesType {
     FlipY,
     Twist,
     CycleState,
+    RotatePortsCcw,
+    RotatePortsCw,
 }
 
 type TrianglesMap = FnvHashMap<TrianglesType, Rc<Triangles>>;
@@ -402,6 +404,14 @@ fn triangles_map(_: ()) -> TrianglesMap {
             TrianglesType::CycleState,
             Rc::new(include!("../../assets/models/cycle_state.tris")),
         ),
+        (
+            TrianglesType::RotatePortsCcw,
+            Rc::new(include!("../../assets/models/rotate_ports_ccw.tris")),
+        ),
+        (
+            TrianglesType::RotatePortsCw,
+            Rc::new(include!("../../assets/models/rotate_ports_cw.tris")),
+        ),
     ]
     .iter()
     .cloned()
@@ -433,6 +443,8 @@ pub enum ModelType {
     FlipY,
     Twist,
     CycleState,
+    RotatePortsCcw,
+    RotatePortsCw,
 }
 
 type ModelMap = FnvHashMap<ModelType, Rc<Model>>;
@@ -571,6 +583,22 @@ fn model_map(gl: &Context) -> ModelMap {
                 gl,
                 &SHADERS.borrow()[&ShaderType::ScaleOffset],
                 &TRIANGLESES.borrow()[&TrianglesType::CycleState],
+            )),
+        ),
+        (
+            ModelType::RotatePortsCcw,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::RotatePortsCcw],
+            )),
+        ),
+        (
+            ModelType::RotatePortsCw,
+            Rc::new(Model::new(
+                gl,
+                &SHADERS.borrow()[&ShaderType::ScaleOffset],
+                &TRIANGLESES.borrow()[&TrianglesType::RotatePortsCw],
             )),
         ),
     ]

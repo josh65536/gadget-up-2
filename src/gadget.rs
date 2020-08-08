@@ -6,8 +6,8 @@ use std::cell::{Cell, Ref, RefCell};
 use std::fmt::{self, Debug, Formatter};
 use std::rc::Rc;
 
-use crate::grid::{Grid, GridItem, WH, XY};
 use crate::bit_serde;
+use crate::grid::{Grid, GridItem, WH, XY};
 use crate::math::{Vec2, Vec2i, Vector2Ex};
 
 use crate::render::GadgetRenderInfo;

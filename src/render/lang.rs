@@ -1,14 +1,14 @@
 use cgmath::prelude::*;
 use cgmath::{vec2, vec3, Vector2, Vector3, Vector4};
 use fnv::FnvHashMap;
+use ref_thread_local::{ref_thread_local, RefThreadLocal};
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::iter::Sum;
 use std::ops::Add;
-use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
-use ref_thread_local::{ref_thread_local, RefThreadLocal};
 
-use super::{Triangles, Vertex, GadgetRenderInfo};
+use super::{GadgetRenderInfo, Triangles, Vertex};
 use crate::gadget::{Gadget, GadgetDef, State, PP};
 use crate::math::{Mat2, Vec2, Vec3, Vector2Ex, TAU_F64};
 use crate::shape::{Circle, Path, Shape};
@@ -370,32 +370,47 @@ impl GrlShape {
                     path = path.iter().subpath(path.len() - *h);
 
                     let dir = path.end_direction();
-                    extra_tris.append(Triangles::new(vec![
-                        Vertex::new(
-                            (path.end_position() + dir.right_cw() * *w / 2.0).extend(z).cast::<f32>().unwrap(),
-                            vec3(0., 0., 0.),
-                            *color,
-                            [],
-                        ),
-                        Vertex::new(
-                            (path.end_position() + dir * *h).extend(z).cast::<f32>().unwrap(),
-                            vec3(0., 0., 0.),
-                            *color,
-                            [],
-                        ),
-                        Vertex::new(
-                            (path.end_position() + dir.right_ccw() * *w / 2.0).extend(z).cast::<f32>().unwrap(),
-                            vec3(0., 0., 0.),
-                            *color,
-                            [],
-                        ),
-                    ], vec![0, 1, 2]));
+                    extra_tris.append(Triangles::new(
+                        vec![
+                            Vertex::new(
+                                (path.end_position() + dir.right_cw() * *w / 2.0)
+                                    .extend(z)
+                                    .cast::<f32>()
+                                    .unwrap(),
+                                vec3(0., 0., 0.),
+                                *color,
+                                [],
+                            ),
+                            Vertex::new(
+                                (path.end_position() + dir * *h)
+                                    .extend(z)
+                                    .cast::<f32>()
+                                    .unwrap(),
+                                vec3(0., 0., 0.),
+                                *color,
+                                [],
+                            ),
+                            Vertex::new(
+                                (path.end_position() + dir.right_ccw() * *w / 2.0)
+                                    .extend(z)
+                                    .cast::<f32>()
+                                    .unwrap(),
+                                vec3(0., 0., 0.),
+                                *color,
+                                [],
+                            ),
+                        ],
+                        vec![0, 1, 2],
+                    ));
                 }
 
                 match line_style {
                     GrlLineStyle::Solid => extra_tris.append(path.triangles(*color)),
 
-                    GrlLineStyle::Dotted { on_space, off_space } => {
+                    GrlLineStyle::Dotted {
+                        on_space,
+                        off_space,
+                    } => {
                         let mut iter = path.iter();
                         while !iter.finished() {
                             extra_tris.append(iter.subpath(*on_space).triangles(*color));
@@ -504,7 +519,7 @@ macro_rules! grl {
     ( position $p0:expr => $p1:expr, $t:expr; dir $rfac:expr, $ufac:expr ) => {
         grl!(position $p0 => $p1, $t; 0.0, $rfac, $ufac)
     };
-    
+
     ( position z $z:expr ) => {
         grl!(position 0.0, 0.0, $z)
     };
@@ -677,7 +692,7 @@ impl GrlCache {
                     );
                 } else {
                     shapes.shapes.push(
-                        grl!(shape path (port_path p0.id() => p1.id(), 0. => 1., Grl::Z), solid)
+                        grl!(shape path (port_path p0.id() => p1.id(), 0. => 1., Grl::Z), solid),
                     );
                 }
             }
@@ -698,7 +713,9 @@ impl GrlCache {
         }
 
         let grl = Rc::new(Self::get_default(def));
-        self.0.borrow_mut().insert(def.hash_string(), Rc::clone(&grl));
+        self.0
+            .borrow_mut()
+            .insert(def.hash_string(), Rc::clone(&grl));
         grl
     }
 }
@@ -721,16 +738,22 @@ ref_thread_local!(
 
 /// If the boolean is true, then replace; otherwise combine with the default
 fn grl_map(map: Vec<(Rc<GadgetDef>, Grl, bool)>) -> GrlMap {
-    map.into_iter().map(|(def, mut grl, replace)| (def.hash_string(), {
-        if !replace {
-            let default = GrlCache::get_default(&def);
-            for (state, mut default_state) in grl.states.iter_mut().zip(default.states.into_iter()) {
-                state.shapes.append(&mut default_state.shapes)
-            }
-        }
+    map.into_iter()
+        .map(|(def, mut grl, replace)| {
+            (def.hash_string(), {
+                if !replace {
+                    let default = GrlCache::get_default(&def);
+                    for (state, mut default_state) in
+                        grl.states.iter_mut().zip(default.states.into_iter())
+                    {
+                        state.shapes.append(&mut default_state.shapes)
+                    }
+                }
 
-        Rc::new(grl)
-    })).collect()
+                Rc::new(grl)
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
